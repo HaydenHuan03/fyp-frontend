@@ -645,8 +645,16 @@ input:-webkit-autofill:focus {
   background: var(--adm-card-bg);
   border: 1px solid var(--adm-border);
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;  /* must be visible so the Actions dropdown isn't clipped */
 }
+
+/* Round the corners of the first header cells so border-radius still shows */
+.adm-table thead tr:first-child th:first-child { border-radius: 10px 0 0 0; }
+.adm-table thead tr:first-child th:last-child  { border-radius: 0 10px 0 0; }
+
+/* Round the last row's cells */
+.adm-table tbody tr:last-child td:first-child { border-radius: 0 0 0 10px; }
+.adm-table tbody tr:last-child td:last-child  { border-radius: 0 0 10px 0; }
 
 .adm-table {
   width: 100%;
