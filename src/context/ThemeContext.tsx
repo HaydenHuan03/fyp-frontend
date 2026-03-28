@@ -14,7 +14,8 @@ const STORAGE_KEY = 'finguard_theme';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'dark';
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return (stored === 'dark' || stored === 'light') ? stored : 'dark';
   });
 
   useEffect(() => {
