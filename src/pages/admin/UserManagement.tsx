@@ -67,43 +67,73 @@ const UserManagement: React.FC = () => {
 
   const handleCreate = async (data: CreateUserPayload | UpdateUserPayload) => {
     if (!authUser) return;
-    const created = await apiCreateUser(authUser.accessToken, data as CreateUserPayload);
-    setUsers(prev => [...prev, created]);
-    showToast('User created successfully.', 'success');
+    try {
+      const created = await apiCreateUser(authUser.accessToken, data as CreateUserPayload);
+      setUsers(prev => [...prev, created]);
+      showToast('User created successfully.', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to create user', 'error');
+      throw err;
+    }
   };
 
   const handleEdit = async (data: CreateUserPayload | UpdateUserPayload) => {
     if (!authUser || modal.type !== 'edit') return;
-    const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, data as UpdateUserPayload);
-    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-    showToast('User updated successfully.', 'success');
+    try {
+      const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, data as UpdateUserPayload);
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      showToast('User updated successfully.', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update user', 'error');
+      throw err;
+    }
   };
 
   const handleResetPassword = async (newPassword: string) => {
     if (!authUser || modal.type !== 'reset') return;
-    await apiResetPassword(authUser.accessToken, modal.user.id, newPassword);
-    showToast('Password reset successfully.', 'success');
+    try {
+      await apiResetPassword(authUser.accessToken, modal.user.id, newPassword);
+      showToast('Password reset successfully.', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to reset password', 'error');
+      throw err;
+    }
   };
 
   const handleSuspend = async () => {
     if (!authUser || modal.type !== 'suspend') return;
-    const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, { status: 'suspended' });
-    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-    showToast('Account suspended.', 'success');
+    try {
+      const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, { status: 'suspended' });
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      showToast('Account suspended.', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to suspend account', 'error');
+      throw err;
+    }
   };
 
   const handleActivate = async () => {
     if (!authUser || modal.type !== 'activate') return;
-    const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, { status: 'active' });
-    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-    showToast('Account activated.', 'success');
+    try {
+      const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, { status: 'active' });
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      showToast('Account activated.', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to activate account', 'error');
+      throw err;
+    }
   };
 
   const handleDelete = async () => {
     if (!authUser || modal.type !== 'delete') return;
-    await apiDeleteUser(authUser.accessToken, modal.user.id);
-    setUsers(prev => prev.filter(u => u.id !== modal.user.id));
-    showToast('User deleted.', 'success');
+    try {
+      await apiDeleteUser(authUser.accessToken, modal.user.id);
+      setUsers(prev => prev.filter(u => u.id !== modal.user.id));
+      showToast('User deleted.', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to delete user', 'error');
+      throw err;
+    }
   };
 
   const closeModal = () => setModal({ type: 'none' });
