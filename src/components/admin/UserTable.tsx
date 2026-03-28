@@ -5,7 +5,6 @@ interface Props {
   users: User[];
   loading: boolean;
   onEdit: (user: User) => void;
-  onResetPassword: (user: User) => void;
   onToggleSuspend: (user: User) => void;
   onDelete: (user: User) => void;
 }
@@ -19,10 +18,9 @@ function formatDate(iso: string): string {
 const ActionsDropdown: React.FC<{
   user: User;
   onEdit: () => void;
-  onResetPassword: () => void;
   onToggleSuspend: () => void;
   onDelete: () => void;
-}> = ({ user, onEdit, onResetPassword, onToggleSuspend, onDelete }) => {
+}> = ({ user, onEdit, onToggleSuspend, onDelete }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -46,14 +44,11 @@ const ActionsDropdown: React.FC<{
           <button className="adm-dropdown-item" onClick={() => { onEdit(); setOpen(false); }}>
             Edit Details
           </button>
-          <button className="adm-dropdown-item" onClick={() => { onResetPassword(); setOpen(false); }}>
-            Reset Password
-          </button>
           <button
-            className={`adm-dropdown-item ${user.status === 'active' ? 'warning' : ''}`}
+            className={`adm-dropdown-item ${user.is_active ? 'warning' : ''}`}
             onClick={() => { onToggleSuspend(); setOpen(false); }}
           >
-            {user.status === 'active' ? 'Suspend Account' : 'Activate Account'}
+            {user.is_active ? 'Suspend Account' : 'Activate Account'}
           </button>
           <button className="adm-dropdown-item danger" onClick={() => { onDelete(); setOpen(false); }}>
             Delete User
@@ -68,8 +63,8 @@ const SkeletonRows: React.FC = () => (
   <>
     {[1, 2, 3, 4].map(i => (
       <tr key={i}>
-        {[1, 2, 3, 4, 5, 6, 7, 8].map(j => (
-          <td key={j}><div className="adm-skeleton" style={{ width: j === 8 ? '80px' : '100%' }} /></td>
+        {[1, 2, 3, 4, 5, 6].map(j => (
+          <td key={j}><div className="adm-skeleton" style={{ width: j === 6 ? '80px' : '100%' }} /></td>
         ))}
       </tr>
     ))}
@@ -77,7 +72,7 @@ const SkeletonRows: React.FC = () => (
 );
 
 const UserTable: React.FC<Props> = ({
-  users, loading, onEdit, onResetPassword, onToggleSuspend, onDelete,
+  users, loading, onEdit, onToggleSuspend, onDelete,
 }) => {
   if (!loading && users.length === 0) {
     return (
@@ -96,9 +91,7 @@ const UserTable: React.FC<Props> = ({
             <th>Email</th>
             <th>Role</th>
             <th>Status</th>
-            <th>Department</th>
             <th>Registered</th>
-            <th>Last Login</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -108,28 +101,23 @@ const UserTable: React.FC<Props> = ({
           ) : (
             users.map(user => (
               <tr key={user.id}>
-                <td style={{ fontWeight: 500 }}>{user.fullName}</td>
+                <td style={{ fontWeight: 500 }}>{user.full_name}</td>
                 <td style={{ color: 'var(--adm-text-muted)' }}>{user.email}</td>
                 <td>
                   <span className={`adm-badge adm-badge-${user.role}`}>
-                    {user.role === 'admin' ? 'Admin' : 'Investigator'}
+                    {user.role === 'admin' ? 'Admin' : 'User'}
                   </span>
                 </td>
                 <td>
-                  <span className={`adm-badge adm-badge-${user.status}`}>
-                    {user.status === 'active' ? 'Active' : 'Suspended'}
+                  <span className={`adm-badge adm-badge-${user.is_active ? 'active' : 'suspended'}`}>
+                    {user.is_active ? 'Active' : 'Suspended'}
                   </span>
                 </td>
-                <td style={{ color: 'var(--adm-text-muted)' }}>{user.department}</td>
-                <td style={{ color: 'var(--adm-text-muted)' }}>{formatDate(user.registeredAt)}</td>
-                <td style={{ color: 'var(--adm-text-muted)' }}>
-                  {user.lastLoginAt ? formatDate(user.lastLoginAt) : '—'}
-                </td>
+                <td style={{ color: 'var(--adm-text-muted)' }}>{formatDate(user.created_at)}</td>
                 <td>
                   <ActionsDropdown
                     user={user}
                     onEdit={() => onEdit(user)}
-                    onResetPassword={() => onResetPassword(user)}
                     onToggleSuspend={() => onToggleSuspend(user)}
                     onDelete={() => onDelete(user)}
                   />

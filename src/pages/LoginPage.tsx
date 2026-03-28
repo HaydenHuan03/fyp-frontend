@@ -1,20 +1,37 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { apiLogin, roleFromToken } from '../lib/api';
+
+const ROLE_HOME = { admin: '/admin/dashboard', user: '/dashboard' } as const;
 
 const LoginPage: React.FC = () => {
-  const [form, setForm]         = useState({ username: '', password: '' });
+  const [form, setForm]         = useState({ email: '', password: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const { login } = useAuth();
+  const navigate  = useNavigate();
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError('');
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+  };
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    // TODO: POST /api/auth/login
-    await new Promise(r => setTimeout(r, 1800));
-    setLoading(false);
-    console.log('Login:', form.username);
+    setError('');
+    try {
+      const data = await apiLogin(form.email, form.password);
+      const role = roleFromToken(data.access_token);
+      login({ email: form.email, role, accessToken: data.access_token, refreshToken: data.refresh_token });
+      navigate(ROLE_HOME[role], { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,9 +90,9 @@ const LoginPage: React.FC = () => {
 
           <form onSubmit={onSubmit}>
 
-            {/* Username */}
+            {/* Email */}
             <div className="lg-field f2">
-              <label htmlFor="username" className="lg-label">Username</label>
+              <label htmlFor="email" className="lg-label">Email</label>
               <div className="lg-wrap">
                 <span className="lg-icon">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -85,13 +102,13 @@ const LoginPage: React.FC = () => {
                   </svg>
                 </span>
                 <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
                   required
-                  placeholder="Username"
-                  value={form.username}
+                  placeholder="Email"
+                  value={form.email}
                   onChange={onChange}
                   className="lg-input"
                 />
@@ -147,6 +164,9 @@ const LoginPage: React.FC = () => {
             <div className="lg-forgot-row f4">
               <a href="#" className="lg-forgot">Forget Password?</a>
             </div>
+
+            {/* Error */}
+            {error && <p className="lg-error">{error}</p>}
 
             {/* Submit */}
             <button type="submit" disabled={loading} className="lg-btn f5">

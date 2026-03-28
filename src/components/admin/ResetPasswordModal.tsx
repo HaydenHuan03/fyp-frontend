@@ -40,7 +40,7 @@ const ResetPasswordModal: React.FC<Props> = ({ user, onConfirm, onClose }) => {
       <div className="adm-modal">
         <div className="adm-modal-title">Reset Password</div>
         <div className="adm-modal-sub">
-          Set a new password for <span>{user.fullName}</span>
+          Set a new password for <span>{user.full_name}</span>
         </div>
 
         <form onSubmit={onSubmit}>

@@ -40,34 +40,34 @@ export function roleFromToken(token: string): UserRole {
 }
 
 // ── User Management ──────────────────────────────────────────────
+// Backend schema (PATCH /users, POST /users, GET /users):
+//   GET/POST response: { id, email, full_name, role: 'admin'|'user', is_active, created_at, keycloak_id? }
+//   POST body:         { email, password, full_name, role? }
+//   PATCH body:        { full_name?, role?, is_active? }
 
-export type UserStatus = 'active' | 'suspended';
-export type UserRoleType = 'admin' | 'investigator';
+export type UserRoleType = 'admin' | 'user';
 
 export interface User {
   id: string;
-  fullName: string;
   email: string;
+  full_name: string;
   role: UserRoleType;
-  status: UserStatus;
-  department: string;
-  registeredAt: string;   // ISO string
-  lastLoginAt: string | null;
+  is_active: boolean;
+  created_at: string;   // ISO string
+  keycloak_id?: string;
 }
 
 export interface CreateUserPayload {
-  fullName: string;
   email: string;
   password: string;
-  role: UserRoleType;
-  department: string;
+  full_name: string;
+  role?: UserRoleType;
 }
 
 export interface UpdateUserPayload {
-  fullName: string;
-  email: string;
-  role: UserRoleType;
-  department: string;
+  full_name?: string;
+  role?: UserRoleType;
+  is_active?: boolean;
 }
 
 function authHeaders(token: string): Record<string, string> {
@@ -78,7 +78,7 @@ function authHeaders(token: string): Record<string, string> {
 }
 
 export async function apiGetUsers(token: string): Promise<User[]> {
-  const res = await fetch(`${BASE_URL}/users`, {
+  const res = await fetch(`${BASE_URL}/users/`, {
     headers: authHeaders(token),
   });
   if (!res.ok) {
@@ -92,7 +92,7 @@ export async function apiCreateUser(
   token: string,
   data: CreateUserPayload,
 ): Promise<User> {
-  const res = await fetch(`${BASE_URL}/users`, {
+  const res = await fetch(`${BASE_URL}/users/`, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify(data),
@@ -107,7 +107,7 @@ export async function apiCreateUser(
 export async function apiUpdateUser(
   token: string,
   id: string,
-  data: Partial<UpdateUserPayload & { status: UserStatus }>,
+  data: UpdateUserPayload,
 ): Promise<User> {
   const res = await fetch(`${BASE_URL}/users/${id}`, {
     method: 'PATCH',
@@ -129,21 +129,5 @@ export async function apiDeleteUser(token: string, id: string): Promise<void> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { detail?: string }).detail ?? 'Failed to delete user');
-  }
-}
-
-export async function apiResetPassword(
-  token: string,
-  id: string,
-  newPassword: string,
-): Promise<void> {
-  const res = await fetch(`${BASE_URL}/users/${id}/reset-password`, {
-    method: 'POST',
-    headers: authHeaders(token),
-    body: JSON.stringify({ new_password: newPassword }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? 'Failed to reset password');
   }
 }

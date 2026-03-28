@@ -2,19 +2,17 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
-  apiGetUsers, apiCreateUser, apiUpdateUser, apiDeleteUser, apiResetPassword,
+  apiGetUsers, apiCreateUser, apiUpdateUser, apiDeleteUser,
   type User, type CreateUserPayload, type UpdateUserPayload,
 } from '../../lib/api';
 import UserTable from '../../components/admin/UserTable';
 import UserModal from '../../components/admin/UserModal';
-import ResetPasswordModal from '../../components/admin/ResetPasswordModal';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 
 type ModalState =
   | { type: 'none' }
   | { type: 'create' }
   | { type: 'edit';    user: User }
-  | { type: 'reset';   user: User }
   | { type: 'suspend'; user: User }
   | { type: 'activate'; user: User }
   | { type: 'delete';  user: User };
@@ -55,13 +53,13 @@ const UserManagement: React.FC = () => {
     const q = search.toLowerCase();
     if (!q) return users;
     return users.filter(u =>
-      u.fullName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
+      u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
     );
   }, [users, search]);
 
   const totalUsers     = users.length;
-  const activeUsers    = users.filter(u => u.status === 'active').length;
-  const suspendedUsers = users.filter(u => u.status === 'suspended').length;
+  const activeUsers    = users.filter(u => u.is_active).length;
+  const suspendedUsers = users.filter(u => !u.is_active).length;
 
   // ── Handlers ──
 
@@ -89,21 +87,10 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleResetPassword = async (newPassword: string) => {
-    if (!authUser || modal.type !== 'reset') return;
-    try {
-      await apiResetPassword(authUser.accessToken, modal.user.id, newPassword);
-      showToast('Password reset successfully.', 'success');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to reset password', 'error');
-      throw err;
-    }
-  };
-
   const handleSuspend = async () => {
     if (!authUser || modal.type !== 'suspend') return;
     try {
-      const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, { status: 'suspended' });
+      const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, { is_active: false });
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
       showToast('Account suspended.', 'success');
     } catch (err) {
@@ -115,7 +102,7 @@ const UserManagement: React.FC = () => {
   const handleActivate = async () => {
     if (!authUser || modal.type !== 'activate') return;
     try {
-      const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, { status: 'active' });
+      const updated = await apiUpdateUser(authUser.accessToken, modal.user.id, { is_active: true });
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
       showToast('Account activated.', 'success');
     } catch (err) {
@@ -182,9 +169,8 @@ const UserManagement: React.FC = () => {
         users={filtered}
         loading={loading}
         onEdit={user => setModal({ type: 'edit', user })}
-        onResetPassword={user => setModal({ type: 'reset', user })}
         onToggleSuspend={user =>
-          setModal({ type: user.status === 'active' ? 'suspend' : 'activate', user })
+          setModal({ type: user.is_active ? 'suspend' : 'activate', user })
         }
         onDelete={user => setModal({ type: 'delete', user })}
       />
@@ -196,13 +182,10 @@ const UserManagement: React.FC = () => {
       {modal.type === 'edit' && (
         <UserModal mode="edit" user={modal.user} onConfirm={handleEdit} onClose={closeModal} />
       )}
-      {modal.type === 'reset' && (
-        <ResetPasswordModal user={modal.user} onConfirm={handleResetPassword} onClose={closeModal} />
-      )}
       {modal.type === 'suspend' && (
         <ConfirmModal
           variant="suspend"
-          userName={modal.user.fullName}
+          userName={modal.user.full_name}
           onConfirm={handleSuspend}
           onClose={closeModal}
         />
@@ -210,7 +193,7 @@ const UserManagement: React.FC = () => {
       {modal.type === 'activate' && (
         <ConfirmModal
           variant="activate"
-          userName={modal.user.fullName}
+          userName={modal.user.full_name}
           onConfirm={handleActivate}
           onClose={closeModal}
         />
@@ -218,7 +201,7 @@ const UserManagement: React.FC = () => {
       {modal.type === 'delete' && (
         <ConfirmModal
           variant="delete"
-          userName={modal.user.fullName}
+          userName={modal.user.full_name}
           onConfirm={handleDelete}
           onClose={closeModal}
         />

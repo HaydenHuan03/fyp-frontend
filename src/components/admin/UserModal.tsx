@@ -9,20 +9,18 @@ interface Props {
 }
 
 interface FormState {
-  fullName: string;
+  full_name: string;
   email: string;
   password: string;
   role: UserRoleType;
-  department: string;
 }
 
 const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
   const [form, setForm] = useState<FormState>({
-    fullName:   user?.fullName   ?? '',
-    email:      user?.email      ?? '',
-    password:   '',
-    role:       user?.role       ?? 'investigator',
-    department: user?.department ?? '',
+    full_name: user?.full_name ?? '',
+    email:     user?.email    ?? '',
+    password:  '',
+    role:      user?.role     ?? 'user',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,11 +28,10 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
   useEffect(() => {
     if (user) {
       setForm({
-        fullName:   user.fullName,
-        email:      user.email,
-        password:   '',
-        role:       user.role,
-        department: user.department,
+        full_name: user.full_name,
+        email:     user.email,
+        password:  '',
+        role:      user.role,
       });
     }
   }, [user]);
@@ -52,18 +49,15 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
     try {
       if (mode === 'create') {
         await onConfirm({
-          fullName:   form.fullName,
-          email:      form.email,
-          password:   form.password,
-          role:       form.role,
-          department: form.department,
+          full_name: form.full_name,
+          email:     form.email,
+          password:  form.password,
+          role:      form.role,
         } satisfies CreateUserPayload);
       } else {
         await onConfirm({
-          fullName:   form.fullName,
-          email:      form.email,
-          role:       form.role,
-          department: form.department,
+          full_name: form.full_name,
+          role:      form.role,
         } satisfies UpdateUserPayload);
       }
       onClose();
@@ -81,7 +75,7 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
           {mode === 'create' ? 'Add New User' : 'Edit User'}
         </div>
         <div className="adm-modal-sub">
-          {mode === 'create' ? 'Fill in the details to create an account.' : `Editing details for ${user?.fullName}.`}
+          {mode === 'create' ? 'Fill in the details to create an account.' : `Editing details for ${user?.full_name}.`}
         </div>
 
         <form onSubmit={onSubmit}>
@@ -90,8 +84,8 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
               <div className="adm-field-label">Full Name</div>
               <input
                 className="adm-input"
-                name="fullName"
-                value={form.fullName}
+                name="full_name"
+                value={form.full_name}
                 onChange={onChange}
                 placeholder="e.g. Alice Tan"
                 required
@@ -107,6 +101,7 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
                 onChange={onChange}
                 placeholder="email@example.com"
                 required
+                disabled={mode === 'edit'}
               />
             </div>
 
@@ -128,29 +123,11 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
             <div>
               <div className="adm-field-label">Role</div>
               <select className="adm-select" name="role" value={form.role} onChange={onChange}>
-                <option value="investigator">Investigator</option>
+                <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
-
-            <div className="full-width">
-              <div className="adm-field-label">Department / Unit</div>
-              <input
-                className="adm-input"
-                name="department"
-                value={form.department}
-                onChange={onChange}
-                placeholder="e.g. Financial Crimes Unit"
-                required
-              />
-            </div>
           </div>
-
-          {mode === 'edit' && (
-            <div className="adm-field-hint">
-              To change this user's password, use Reset Password from the Actions menu.
-            </div>
-          )}
 
           {error && <div className="adm-field-error" style={{ marginBottom: '12px' }}>{error}</div>}
 
