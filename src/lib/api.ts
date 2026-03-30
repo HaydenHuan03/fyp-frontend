@@ -13,7 +13,7 @@ export async function apiLogin(email: string, password: string): Promise<LoginRe
   const res = await fetch(`${BASE_URL}/users/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ identifier: email, password }),
   });
 
   if (!res.ok) {
@@ -39,12 +39,6 @@ export function roleFromToken(token: string): UserRole {
   return roles.includes('admin') ? 'admin' : 'user';
 }
 
-// ── User Management ──────────────────────────────────────────────
-// Backend schema (PATCH /users, POST /users, GET /users):
-//   GET/POST response: { id, email, full_name, role: 'admin'|'user', is_active, created_at, keycloak_id? }
-//   POST body:         { email, password, full_name, role? }
-//   PATCH body:        { full_name?, role?, is_active? }
-
 export type UserRoleType = 'admin' | 'user';
 
 export interface User {
@@ -58,6 +52,7 @@ export interface User {
 }
 
 export interface CreateUserPayload {
+  username: string;
   email: string;
   password: string;
   full_name: string;
@@ -77,15 +72,23 @@ function authHeaders(token: string): Record<string, string> {
   };
 }
 
+async function handleResponse<T>(res: Response, fallbackMessage: string): Promise<T> {
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
+    throw new Error('Session expired. Please log in again.');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail ?? fallbackMessage);
+  }
+  return res.json() as Promise<T>;
+}
+
 export async function apiGetUsers(token: string): Promise<User[]> {
   const res = await fetch(`${BASE_URL}/users/`, {
     headers: authHeaders(token),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? 'Failed to fetch users');
-  }
-  return res.json() as Promise<User[]>;
+  return handleResponse<User[]>(res, 'Failed to fetch users');
 }
 
 export async function apiCreateUser(
@@ -97,11 +100,7 @@ export async function apiCreateUser(
     headers: authHeaders(token),
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? 'Failed to create user');
-  }
-  return res.json() as Promise<User>;
+  return handleResponse<User>(res, 'Failed to create user');
 }
 
 export async function apiUpdateUser(
@@ -114,11 +113,7 @@ export async function apiUpdateUser(
     headers: authHeaders(token),
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? 'Failed to update user');
-  }
-  return res.json() as Promise<User>;
+  return handleResponse<User>(res, 'Failed to update user');
 }
 
 export async function apiDeleteUser(token: string, id: string): Promise<void> {
@@ -126,6 +121,10 @@ export async function apiDeleteUser(token: string, id: string): Promise<void> {
     method: 'DELETE',
     headers: authHeaders(token),
   });
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
+    throw new Error('Session expired. Please log in again.');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { detail?: string }).detail ?? 'Failed to delete user');

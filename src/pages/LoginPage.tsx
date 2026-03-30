@@ -90,9 +90,9 @@ const LoginPage: React.FC = () => {
 
           <form onSubmit={onSubmit}>
 
-            {/* Email */}
+            {/* Email / Username */}
             <div className="lg-field f2">
-              <label htmlFor="email" className="lg-label">Email</label>
+              <label htmlFor="email" className="lg-label">Email or Username</label>
               <div className="lg-wrap">
                 <span className="lg-icon">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -104,10 +104,10 @@ const LoginPage: React.FC = () => {
                 <input
                   id="email"
                   name="email"
-                  type="email"
-                  autoComplete="email"
+                  type="text"
+                  autoComplete="username"
                   required
-                  placeholder="Email"
+                  placeholder="Email or username"
                   value={form.email}
                   onChange={onChange}
                   className="lg-input"

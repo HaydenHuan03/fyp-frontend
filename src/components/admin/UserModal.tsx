@@ -9,6 +9,7 @@ interface Props {
 }
 
 interface FormState {
+  username: string;
   full_name: string;
   email: string;
   password: string;
@@ -17,6 +18,7 @@ interface FormState {
 
 const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
   const [form, setForm] = useState<FormState>({
+    username:  '',
     full_name: user?.full_name ?? '',
     email:     user?.email    ?? '',
     password:  '',
@@ -28,6 +30,7 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
   useEffect(() => {
     if (user) {
       setForm({
+        username:  '',
         full_name: user.full_name,
         email:     user.email,
         password:  '',
@@ -49,6 +52,7 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
     try {
       if (mode === 'create') {
         await onConfirm({
+          username:  form.username,
           full_name: form.full_name,
           email:     form.email,
           password:  form.password,
@@ -91,6 +95,19 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
                 required
               />
             </div>
+            {mode === 'create' && (
+              <div>
+                <div className="adm-field-label">Username</div>
+                <input
+                  className="adm-input"
+                  name="username"
+                  value={form.username}
+                  onChange={onChange}
+                  placeholder="e.g. alicetan"
+                  required
+                />
+              </div>
+            )}
             <div>
               <div className="adm-field-label">Email</div>
               <input
