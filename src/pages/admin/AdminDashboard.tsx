@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import UserManagement from './UserManagement';
+import KnowledgeBase from './KnowledgeBase';
+import Documents from './Documents';
 
 type Section = 'users' | 'knowledge' | 'documents';
 
@@ -12,12 +14,6 @@ const sectionLabel: Record<Section, string> = {
   documents: 'Documents',
 };
 
-const ComingSoon: React.FC<{ name: string }> = ({ name }) => (
-  <div className="adm-coming-soon">
-    <h2>{name}</h2>
-    <p>This section is coming soon.</p>
-  </div>
-);
 
 const AdminDashboard: React.FC = () => {
   const [section, setSection] = useState<Section>('users');
@@ -42,8 +38,8 @@ const AdminDashboard: React.FC = () => {
         </header>
         <main className="adm-main">
           {section === 'users'     && <UserManagement />}
-          {section === 'knowledge' && <ComingSoon name="Knowledge Base" />}
-          {section === 'documents' && <ComingSoon name="Documents" />}
+          {section === 'knowledge' && <KnowledgeBase />}
+          {section === 'documents' && <Documents />}
         </main>
       </div>
     </div>

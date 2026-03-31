@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { Lock } from 'lucide-react';
 
 export type UserRole = 'admin' | 'user';
 
@@ -49,19 +50,27 @@ function loadUser(): AuthUser | null {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(loadUser);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const userRef = useRef(user);
 
   const login = (u: AuthUser) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
     setUser(u);
+    userRef.current = u;
   };
 
   const logout = () => {
     localStorage.removeItem(STORAGE_KEY);
     setUser(null);
+    userRef.current = null;
   };
 
   useEffect(() => {
-    const handler = () => setSessionExpired(true);
+    // Only show the modal when a 401 arrives while the user was actively logged in.
+    // On page refresh with an expired token, loadUser() already returns null so
+    // userRef.current is null and ProtectedRoute handles the redirect silently.
+    const handler = () => {
+      if (userRef.current) setSessionExpired(true);
+    };
     window.addEventListener('finguard:unauthorized', handler);
     return () => window.removeEventListener('finguard:unauthorized', handler);
   }, []);
@@ -75,17 +84,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{ user, login, logout }}>
       {children}
       {sessionExpired && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl p-8 max-w-sm w-full mx-4 text-center">
-            <div className="text-4xl mb-4">⏰</div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Session Expired</h2>
-            <p className="text-gray-500 mb-6 text-sm">
-              Your session has expired. Please log in again to continue.
+        <div className="sess-overlay" role="dialog" aria-modal="true" aria-labelledby="sess-title">
+          <div className="sess-card">
+            <div className="sess-icon-wrap" aria-hidden="true">
+              <Lock size={22} />
+            </div>
+            <h2 id="sess-title" className="sess-title">Session Expired</h2>
+            <p className="sess-body">
+              Your session has timed out for security. Please log in again to continue.
             </p>
-            <button
-              onClick={handleRelogin}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-            >
+            <button className="sess-btn" onClick={handleRelogin}>
               Log In Again
             </button>
           </div>

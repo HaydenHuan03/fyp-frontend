@@ -43,6 +43,12 @@ npm run preview    # Preview production build locally
 
 **TypeScript config:** `tsconfig.app.json` enforces `noUnusedLocals` and `noUnusedParameters` — unused imports/variables will cause build errors.
 
+**Editing rules — must follow every time:**
+- **Make surgical edits only.** Change only what was asked. Do NOT rewrite entire files, sections, or CSS blocks unless the task explicitly requires it. Use the Edit tool with targeted `old_string`/`new_string` pairs.
+- When replacing an import block with the Edit tool, check that interface/type definitions immediately following the imports are NOT part of the selection being replaced. Interface definitions often appear right after imports with no blank-line separation — always verify the `old_string` boundary ends at the last import line, not beyond it.
+- After any edit that touches the top of a file, run `npm run build` immediately to catch missing declarations before proceeding.
+- `lucide-react` is installed — use it for all icons. Never write inline SVG icon components when a Lucide equivalent exists.
+
 # Design Thinking
 
 Before coding, understand the context and commit to a BOLD aesthetic direction:
@@ -71,6 +77,8 @@ Focus on:
 NEVER use generic AI-generated aesthetics like overused font families (Inter, Roboto, Arial, system fonts), cliched color schemes (particularly purple gradients on white backgrounds), predictable layouts and component patterns, and cookie-cutter design that lacks context-specific character.
 
 Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. NEVER converge on common choices (Space Grotesk, for example) across generations.
+
+Do not automatically use Claude “superpower skills” or special tools unless explicitly required by the task. Prefer standard code edits and reasoning unless the instruction clearly requests the use of a specific advanced capability.
 
 **IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
 

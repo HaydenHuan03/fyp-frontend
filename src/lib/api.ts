@@ -130,3 +130,131 @@ export async function apiDeleteUser(token: string, id: string): Promise<void> {
     throw new Error((err as { detail?: string }).detail ?? 'Failed to delete user');
   }
 }
+
+// ── Chat ────────────────────────────────────────────────────────────────────
+
+export interface Conversation {
+  id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  content: string;
+  sources: string[] | null;
+  created_at: string;
+}
+
+export async function apiListConversations(token: string): Promise<Conversation[]> {
+  const res = await fetch(`${BASE_URL}/chat/conversations`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<Conversation[]>(res, 'Failed to fetch conversations');
+}
+
+export async function apiCreateConversation(token: string, title: string): Promise<Conversation> {
+  const res = await fetch(`${BASE_URL}/chat/conversations`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ title }),
+  });
+  return handleResponse<Conversation>(res, 'Failed to create conversation');
+}
+
+export async function apiDeleteConversation(token: string, id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/chat/conversations/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
+    throw new Error('Session expired. Please log in again.');
+  }
+  if (res.status === 204) return;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail ?? 'Failed to delete conversation');
+  }
+}
+
+export async function apiGetConversationMessages(token: string, id: number): Promise<ChatMessage[]> {
+  const res = await fetch(`${BASE_URL}/chat/conversations/${id}/messages`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<ChatMessage[]>(res, 'Failed to fetch messages');
+}
+
+/** WebSocket base URL derived from the REST base URL. */
+export const WS_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000')
+  .replace(/^https/, 'wss')
+  .replace(/^http/, 'ws');
+
+// ── Knowledge Base (RAG Documents) ──────────────────────────────────────────
+
+export type IngestStatus = 'pending' | 'ingested' | 'failed';
+
+export interface DocumentListItem {
+  id: number;
+  filename: string;
+  file_size: number;
+  uploaded_by: string;
+  uploaded_at: string;   // ISO string
+  ingest_status: IngestStatus;
+  ingested_at: string | null;
+}
+
+export interface DocumentUploadResponse {
+  id: number;
+  filename: string;
+  file_size: number;
+  ingest_status: IngestStatus;
+  uploaded_at: string;
+}
+
+export async function apiListDocuments(token: string): Promise<DocumentListItem[]> {
+  const res = await fetch(`${BASE_URL}/rag/documents`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<DocumentListItem[]>(res, 'Failed to fetch documents');
+}
+
+export async function apiUploadDocument(
+  token: string,
+  file: File,
+): Promise<DocumentUploadResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${BASE_URL}/rag/documents`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  return handleResponse<DocumentUploadResponse>(res, 'Failed to upload document');
+}
+
+export async function apiIngestDocument(token: string, id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/rag/documents/${id}/ingest`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  await handleResponse<unknown>(res, 'Failed to ingest document');
+}
+
+export async function apiDeleteDocument(token: string, id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/rag/documents/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
+    throw new Error('Session expired. Please log in again.');
+  }
+  if (res.status === 204) return;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail ?? 'Failed to delete document');
+  }
+}

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import type { User, CreateUserPayload, UpdateUserPayload, UserRoleType } from '../../lib/api';
 
 interface Props {
@@ -17,6 +18,7 @@ interface FormState {
 }
 
 const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
+  const titleId = useId();
   const [form, setForm] = useState<FormState>({
     username:  '',
     full_name: user?.full_name ?? '',
@@ -26,6 +28,7 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -73,80 +76,121 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
   };
 
   return (
-    <div className="adm-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="adm-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div className="adm-modal">
-        <div className="adm-modal-title">
+        <div id={titleId} className="adm-modal-title">
           {mode === 'create' ? 'Add New User' : 'Edit User'}
         </div>
         <div className="adm-modal-sub">
-          {mode === 'create' ? 'Fill in the details to create an account.' : `Editing details for ${user?.full_name}.`}
+          {mode === 'create'
+            ? 'Fill in the details to create an account.'
+            : `Editing details for ${user?.full_name}.`}
         </div>
 
         <form onSubmit={onSubmit}>
           <div className="adm-form-grid">
             <div>
-              <div className="adm-field-label">Full Name</div>
+              <label htmlFor="modal-full_name" className="adm-field-label">
+                Full Name<span className="adm-required">*</span>
+              </label>
               <input
+                id="modal-full_name"
                 className="adm-input"
                 name="full_name"
                 value={form.full_name}
                 onChange={onChange}
                 placeholder="e.g. Alice Tan"
+                autoComplete="name"
                 required
               />
             </div>
             {mode === 'create' && (
               <div>
-                <div className="adm-field-label">Username</div>
+                <label htmlFor="modal-username" className="adm-field-label">
+                  Username<span className="adm-required">*</span>
+                </label>
                 <input
+                  id="modal-username"
                   className="adm-input"
                   name="username"
                   value={form.username}
                   onChange={onChange}
                   placeholder="e.g. alicetan"
+                  autoComplete="username"
                   required
                 />
               </div>
             )}
             <div>
-              <div className="adm-field-label">Email</div>
+              <label htmlFor="modal-email" className="adm-field-label">
+                Email{mode === 'create' && <span className="adm-required">*</span>}
+              </label>
               <input
+                id="modal-email"
                 className="adm-input"
                 name="email"
                 type="email"
                 value={form.email}
                 onChange={onChange}
                 placeholder="email@example.com"
-                required
+                autoComplete="email"
+                required={mode === 'create'}
                 disabled={mode === 'edit'}
               />
+              {mode === 'edit' && (
+                <div className="adm-field-hint">Email cannot be changed after creation.</div>
+              )}
             </div>
 
             {mode === 'create' && (
               <div>
-                <div className="adm-field-label">Password</div>
-                <input
-                  className="adm-input"
-                  name="password"
-                  type="password"
-                  value={form.password}
-                  onChange={onChange}
-                  placeholder="••••••••"
-                  required
-                />
+                <label htmlFor="modal-password" className="adm-field-label">
+                  Password<span className="adm-required">*</span>
+                </label>
+                <div className="adm-input-wrap">
+                  <input
+                    id="modal-password"
+                    className="adm-input"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={onChange}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="adm-pwd-toggle"
+                    onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={15} aria-hidden /> : <Eye size={15} aria-hidden />}
+                  </button>
+                </div>
               </div>
             )}
 
             <div>
-              <div className="adm-field-label">Role</div>
-              <select className="adm-select" name="role" value={form.role} onChange={onChange}>
+              <label htmlFor="modal-role" className="adm-field-label">Role</label>
+              <select id="modal-role" className="adm-select" name="role" value={form.role} onChange={onChange}>
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
           </div>
 
-          {error && <div className="adm-field-error" style={{ marginBottom: '12px' }}>{error}</div>}
+          {error && (
+            <div className="adm-field-error" role="alert" style={{ marginBottom: '12px' }}>
+              {error}
+            </div>
+          )}
 
           <div className="adm-modal-footer">
             <button type="button" className="adm-btn-secondary" onClick={onClose}>
