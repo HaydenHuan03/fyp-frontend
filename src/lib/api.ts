@@ -44,6 +44,8 @@ export type UserRoleType = 'admin' | 'user';
 export interface User {
   id: string;
   email: string;
+  first_name: string;
+  last_name: string;
   full_name: string;
   role: UserRoleType;
   is_active: boolean;
@@ -55,12 +57,14 @@ export interface CreateUserPayload {
   username: string;
   email: string;
   password: string;
-  full_name: string;
+  first_name: string;
+  last_name: string;
   role?: UserRoleType;
 }
 
 export interface UpdateUserPayload {
-  full_name?: string;
+  first_name?: string;
+  last_name?: string;
   role?: UserRoleType;
   is_active?: boolean;
 }

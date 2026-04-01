@@ -11,7 +11,8 @@ interface Props {
 
 interface FormState {
   username: string;
-  full_name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   password: string;
   role: UserRoleType;
@@ -20,11 +21,12 @@ interface FormState {
 const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
   const titleId = useId();
   const [form, setForm] = useState<FormState>({
-    username:  '',
-    full_name: user?.full_name ?? '',
-    email:     user?.email    ?? '',
-    password:  '',
-    role:      user?.role     ?? 'user',
+    username:   '',
+    first_name: user?.first_name ?? '',
+    last_name:  user?.last_name  ?? '',
+    email:      user?.email      ?? '',
+    password:   '',
+    role:       user?.role       ?? 'user',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,11 +35,12 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
   useEffect(() => {
     if (user) {
       setForm({
-        username:  '',
-        full_name: user.full_name,
-        email:     user.email,
-        password:  '',
-        role:      user.role,
+        username:   '',
+        first_name: user.first_name,
+        last_name:  user.last_name,
+        email:      user.email,
+        password:   '',
+        role:       user.role,
       });
     }
   }, [user]);
@@ -55,16 +58,18 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
     try {
       if (mode === 'create') {
         await onConfirm({
-          username:  form.username,
-          full_name: form.full_name,
-          email:     form.email,
-          password:  form.password,
-          role:      form.role,
+          username:   form.username,
+          first_name: form.first_name,
+          last_name:  form.last_name,
+          email:      form.email,
+          password:   form.password,
+          role:       form.role,
         } satisfies CreateUserPayload);
       } else {
         await onConfirm({
-          full_name: form.full_name,
-          role:      form.role,
+          first_name: form.first_name,
+          last_name:  form.last_name,
+          role:       form.role,
         } satisfies UpdateUserPayload);
       }
       onClose();
@@ -90,23 +95,38 @@ const UserModal: React.FC<Props> = ({ mode, user, onConfirm, onClose }) => {
         <div className="adm-modal-sub">
           {mode === 'create'
             ? 'Fill in the details to create an account.'
-            : `Editing details for ${user?.full_name}.`}
+            : `Editing details for ${user?.first_name} ${user?.last_name}`.trim() + '.'}
         </div>
 
         <form onSubmit={onSubmit}>
           <div className="adm-form-grid">
             <div>
-              <label htmlFor="modal-full_name" className="adm-field-label">
-                Full Name<span className="adm-required">*</span>
+              <label htmlFor="modal-first_name" className="adm-field-label">
+                First Name<span className="adm-required">*</span>
               </label>
               <input
-                id="modal-full_name"
+                id="modal-first_name"
                 className="adm-input"
-                name="full_name"
-                value={form.full_name}
+                name="first_name"
+                value={form.first_name}
                 onChange={onChange}
-                placeholder="e.g. Alice Tan"
-                autoComplete="name"
+                placeholder="e.g. Alice"
+                autoComplete="given-name"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="modal-last_name" className="adm-field-label">
+                Last Name<span className="adm-required">*</span>
+              </label>
+              <input
+                id="modal-last_name"
+                className="adm-input"
+                name="last_name"
+                value={form.last_name}
+                onChange={onChange}
+                placeholder="e.g. Tan"
+                autoComplete="family-name"
                 required
               />
             </div>
