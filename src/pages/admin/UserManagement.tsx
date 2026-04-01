@@ -1,5 +1,6 @@
 // src/pages/admin/UserManagement.tsx
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Plus, Users, CheckCircle, XCircle, Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   apiGetUsers, apiCreateUser, apiUpdateUser, apiDeleteUser,
@@ -133,10 +134,7 @@ const UserManagement: React.FC = () => {
           <div className="adm-page-sub">Manage investigator accounts</div>
         </div>
         <button className="adm-btn-primary" onClick={() => setModal({ type: 'create' })}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
+          <Plus size={14} strokeWidth={2.5} />
           Add New User
         </button>
       </div>
@@ -145,13 +143,7 @@ const UserManagement: React.FC = () => {
       <div className="adm-stats">
         <div className="adm-stat-card">
           <div className="adm-stat-icon adm-stat-icon--indigo">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f46e5"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
+            <Users size={18} color="#4f46e5" />
           </div>
           <div className="adm-stat-body">
             <div className="adm-stat-value adm-stat-value--indigo">{loading ? '—' : totalUsers}</div>
@@ -160,11 +152,7 @@ const UserManagement: React.FC = () => {
         </div>
         <div className="adm-stat-card">
           <div className="adm-stat-icon adm-stat-icon--green">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
+            <CheckCircle size={18} color="#16a34a" />
           </div>
           <div className="adm-stat-body">
             <div className="adm-stat-value adm-stat-value--green">{loading ? '—' : activeUsers}</div>
@@ -173,12 +161,7 @@ const UserManagement: React.FC = () => {
         </div>
         <div className="adm-stat-card">
           <div className="adm-stat-icon adm-stat-icon--red">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="15" y1="9" x2="9" y2="15" />
-              <line x1="9" y1="9" x2="15" y2="15" />
-            </svg>
+            <XCircle size={18} color="#dc2626" />
           </div>
           <div className="adm-stat-body">
             <div className="adm-stat-value adm-stat-value--red">{loading ? '—' : suspendedUsers}</div>
@@ -192,10 +175,7 @@ const UserManagement: React.FC = () => {
         <div className="adm-table-toolbar">
           <div className="adm-search-wrap">
             <span className="adm-search-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              <Search size={14} />
             </span>
             <input
               className="adm-search-input"

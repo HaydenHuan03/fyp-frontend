@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { Landmark, Plus, MessageSquare, X, LogOut, Send } from 'lucide-react';
 import {
   apiListConversations,
   apiCreateConversation,
@@ -246,9 +247,7 @@ const UserDashboard: React.FC = () => {
         <div className="ch-sidebar-head">
           <div className="ch-brand">
             <div className="ch-brand-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3v18M3 6l9-3 9 3M3 6v6c0 4.97 4.03 9 9 9s9-4.03 9-9V6" />
-              </svg>
+              <Landmark size={16} color="#fff" strokeWidth={2.2} />
             </div>
             <div>
               <div className="ch-brand-name">FinGuardMY</div>
@@ -259,9 +258,7 @@ const UserDashboard: React.FC = () => {
 
         <div className="ch-sidebar-body">
           <button className="ch-new-btn" onClick={startNewChat}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
+            <Plus size={13} strokeWidth={2.5} aria-hidden="true" />
             New Chat
           </button>
 
@@ -275,9 +272,7 @@ const UserDashboard: React.FC = () => {
                   onClick={() => selectConversation(s.id)}
                   aria-current={s.id === activeId ? 'page' : undefined}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-                  </svg>
+                  <MessageSquare size={12} aria-hidden="true" />
                   <span className="ch-session-title">{s.title}</span>
                   <span
                     className="ch-session-delete"
@@ -285,9 +280,7 @@ const UserDashboard: React.FC = () => {
                     aria-label={`Delete ${s.title}`}
                     onClick={(e) => deleteSession(e, s.id)}
                   >
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
+                    <X size={11} strokeWidth={2.5} aria-hidden="true" />
                   </span>
                 </button>
               ))}
@@ -306,9 +299,7 @@ const UserDashboard: React.FC = () => {
             </div>
           </div>
           <button className="ch-logout-btn" onClick={handleLogout} aria-label="Log out">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
-            </svg>
+            <LogOut size={15} aria-hidden="true" />
           </button>
         </div>
       </aside>
@@ -320,9 +311,7 @@ const UserDashboard: React.FC = () => {
         {(!activeSession || activeSession.messages.length === 0) && (
           <div className="ch-empty">
             <div className="ch-empty-icon" aria-hidden="true">
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3v18M3 6l9-3 9 3M3 6v6c0 4.97 4.03 9 9 9s9-4.03 9-9V6" />
-              </svg>
+              <Landmark size={30} strokeWidth={1.5} />
             </div>
             <h1 className="ch-empty-title">How can I assist your investigation?</h1>
             <p className="ch-empty-sub">
@@ -345,9 +334,7 @@ const UserDashboard: React.FC = () => {
               <div key={msg.id} className={`ch-msg-row ch-msg-${msg.role}`}>
                 {msg.role === 'assistant' && (
                   <div className="ch-ai-avatar" aria-hidden="true">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 3v18M3 6l9-3 9 3M3 6v6c0 4.97 4.03 9 9 9s9-4.03 9-9V6" />
-                    </svg>
+                    <Landmark size={13} strokeWidth={2.2} />
                   </div>
                 )}
                 <div className={`ch-bubble ch-bubble-${msg.role}`}>
@@ -398,10 +385,7 @@ const UserDashboard: React.FC = () => {
               disabled={!input.trim() || busy}
               aria-label="Send message"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="22" y1="2" x2="11" y2="13"/>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
+              <Send size={15} strokeWidth={2.5} aria-hidden="true" />
             </button>
           </div>
           <p className="ch-input-note">
