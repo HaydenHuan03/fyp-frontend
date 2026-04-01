@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Landmark, Plus, MessageSquare, X, LogOut, Send } from 'lucide-react';
+import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip } from 'lucide-react';
 import {
   apiListConversations,
   apiCreateConversation,
@@ -45,8 +45,11 @@ const UserDashboard: React.FC = () => {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<{ name: string; content: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeSession = sessions.find(s => s.id === activeId) ?? null;
 
@@ -126,10 +129,27 @@ const UserDashboard: React.FC = () => {
     navigate('/', { replace: true });
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const content = ev.target?.result as string;
+      setAttachedFile({ name: file.name, content });
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const send = async (question: string) => {
     if (!question.trim() || busy) return;
+    const currentFile = attachedFile;
+    const fullQuestion = currentFile
+      ? `[Attached file: ${currentFile.name}]\n\n${currentFile.content}\n\n---\n\n${question}`
+      : question;
     setBusy(true);
     setInput('');
+    setAttachedFile(null);
     setTimeout(() => {
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
     }, 0);
@@ -141,7 +161,7 @@ const UserDashboard: React.FC = () => {
       try {
         conv = await apiCreateConversation(
           user!.accessToken,
-          question.slice(0, 50) + (question.length > 50 ? '…' : ''),
+          (currentFile ? `[${currentFile.name}] ` : '') + question.slice(0, 50) + (question.length > 50 ? '…' : ''),
         );
       } catch {
         setBusy(false);
@@ -161,7 +181,7 @@ const UserDashboard: React.FC = () => {
       ...s,
       messages: [
         ...s.messages,
-        { id: userMsgId, role: 'user' as const, content: question },
+        { id: userMsgId, role: 'user' as const, content: question + (currentFile ? ` [${currentFile.name}]` : '') },
         { id: aiMsgId, role: 'assistant' as const, content: '', streaming: true },
       ],
     }));
@@ -176,7 +196,7 @@ const UserDashboard: React.FC = () => {
           // Step 1: authenticate
           ws.send(JSON.stringify({ token: user!.accessToken }));
           // Step 2: send question
-          ws.send(JSON.stringify({ question }));
+          ws.send(JSON.stringify({ question: fullQuestion }));
 
           ws.onmessage = (event: MessageEvent) => {
             let data: { type: string; content?: string; sources?: string[]; detail?: string };
@@ -247,7 +267,7 @@ const UserDashboard: React.FC = () => {
         <div className="ch-sidebar-head">
           <div className="ch-brand">
             <div className="ch-brand-icon" aria-hidden="true">
-              <Landmark size={16} color="#fff" strokeWidth={2.2} />
+              <Scale size={16} color="#fff" strokeWidth={2.2} />
             </div>
             <div>
               <div className="ch-brand-name">FinGuardMY</div>
@@ -298,7 +318,7 @@ const UserDashboard: React.FC = () => {
               <div className="ch-user-role">{user?.role}</div>
             </div>
           </div>
-          <button className="ch-logout-btn" onClick={handleLogout} aria-label="Log out">
+          <button className="ch-logout-btn" onClick={() => setShowLogoutConfirm(true)} aria-label="Log out">
             <LogOut size={15} aria-hidden="true" />
           </button>
         </div>
@@ -311,7 +331,7 @@ const UserDashboard: React.FC = () => {
         {(!activeSession || activeSession.messages.length === 0) && (
           <div className="ch-empty">
             <div className="ch-empty-icon" aria-hidden="true">
-              <Landmark size={30} strokeWidth={1.5} />
+              <Scale size={34} strokeWidth={1.5} />
             </div>
             <h1 className="ch-empty-title">How can I assist your investigation?</h1>
             <p className="ch-empty-sub">
@@ -334,7 +354,7 @@ const UserDashboard: React.FC = () => {
               <div key={msg.id} className={`ch-msg-row ch-msg-${msg.role}`}>
                 {msg.role === 'assistant' && (
                   <div className="ch-ai-avatar" aria-hidden="true">
-                    <Landmark size={13} strokeWidth={2.2} />
+                    <Scale size={13} strokeWidth={2.2} />
                   </div>
                 )}
                 <div className={`ch-bubble ch-bubble-${msg.role}`}>
@@ -366,7 +386,36 @@ const UserDashboard: React.FC = () => {
 
         {/* Input */}
         <div className="ch-input-area">
+          {attachedFile && (
+            <div className="ch-file-chip">
+              <Paperclip size={11} />
+              <span className="ch-file-chip-name">{attachedFile.name}</span>
+              <button
+                className="ch-file-chip-remove"
+                onClick={() => setAttachedFile(null)}
+                aria-label="Remove attachment"
+              >
+                <X size={11} />
+              </button>
+            </div>
+          )}
           <div className="ch-input-box">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.csv,.md,.json,.log"
+              style={{ display: 'none' }}
+              onChange={handleFileChange}
+            />
+            <button
+              className="ch-attach-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy}
+              aria-label="Attach file"
+              title="Attach a file (.txt, .csv, .md, .json)"
+            >
+              <Paperclip size={15} />
+            </button>
             <textarea
               ref={textareaRef}
               className="ch-textarea"
@@ -394,6 +443,23 @@ const UserDashboard: React.FC = () => {
         </div>
 
       </main>
+
+      {showLogoutConfirm && (
+        <div className="ch-logout-overlay" onClick={() => setShowLogoutConfirm(false)}>
+          <div className="ch-logout-modal" onClick={e => e.stopPropagation()}>
+            <div className="ch-logout-modal-title">Sign Out</div>
+            <div className="ch-logout-modal-body">Are you sure you want to sign out?</div>
+            <div className="ch-logout-modal-footer">
+              <button className="ch-logout-cancel" onClick={() => setShowLogoutConfirm(false)}>
+                Cancel
+              </button>
+              <button className="ch-logout-confirm" onClick={handleLogout}>
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

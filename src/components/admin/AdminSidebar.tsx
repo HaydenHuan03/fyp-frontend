@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Users, BookOpen, FileText, Shield } from 'lucide-react';
+import { Users, BookOpen, FileText, Scale } from 'lucide-react';
 
 type Section = 'users' | 'knowledge' | 'documents';
 
@@ -19,6 +20,7 @@ function getInitials(email: string): string {
 const AdminSidebar: React.FC<Props> = ({ activeSection, onSectionChange }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -28,12 +30,13 @@ const AdminSidebar: React.FC<Props> = ({ activeSection, onSectionChange }) => {
   const initials = user?.email ? getInitials(user.email) : 'AD';
 
   return (
+    <>
     <aside className="adm-sidebar">
       {/* Logo */}
       <div className="adm-logo-section">
         <div className="adm-logo">
           <div className="adm-logo-icon">
-            <Shield size={14} color="#fff" strokeWidth={2.5} />
+            <Scale size={14} color="#fff" strokeWidth={2.5} />
           </div>
           <div className="adm-logo-wordmark">
             <span className="adm-logo-text">FinGuardMY</span>
@@ -78,11 +81,29 @@ const AdminSidebar: React.FC<Props> = ({ activeSection, onSectionChange }) => {
             <div className="adm-user-role-label">Administrator</div>
           </div>
         </div>
-        <button className="adm-signout-btn" onClick={handleLogout}>
+        <button className="adm-signout-btn" onClick={() => setShowLogoutConfirm(true)}>
           Sign out
         </button>
       </div>
     </aside>
+
+      {showLogoutConfirm && (
+        <div className="adm-modal-overlay" onClick={() => setShowLogoutConfirm(false)}>
+          <div className="adm-modal" onClick={e => e.stopPropagation()}>
+            <div className="adm-modal-title">Sign Out</div>
+            <div className="adm-modal-sub">Are you sure you want to sign out of the Admin Console?</div>
+            <div className="adm-modal-footer">
+              <button className="adm-btn-secondary" onClick={() => setShowLogoutConfirm(false)}>
+                Cancel
+              </button>
+              <button className="adm-btn-danger" onClick={handleLogout}>
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

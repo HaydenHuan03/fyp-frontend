@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiLogin, roleFromToken } from '../lib/api';
-import { Landmark, Shield, Search, User, Lock, Eye, EyeOff } from 'lucide-react';
+import { Scale, Shield, Search, User, Lock, Eye, EyeOff } from 'lucide-react';
 
 const ROLE_HOME = { admin: '/admin/dashboard', user: '/dashboard' } as const;
 
@@ -47,7 +47,7 @@ const LoginPage: React.FC = () => {
 
         {/* Logo */}
         <div className="lg-logo">
-          <Landmark size={22} color="#fff" strokeWidth={2.2} />
+          <Scale size={22} color="#fff" strokeWidth={2.2} />
           <span className="lg-logo-text">FinGuardMY</span>
         </div>
 
