@@ -1369,13 +1369,160 @@ input:-webkit-autofill:focus {
 }
 
 /* Status badges */
-.kb-badge-pending  { background: var(--adm-warning-tint); color: var(--adm-warning); gap: 4px; }
-.kb-badge-ingested { background: var(--adm-success-tint); color: var(--adm-success); gap: 4px; }
-.kb-badge-failed   { background: var(--adm-danger-tint);  color: var(--adm-danger);  gap: 4px; }
+.kb-badge-pending   { background: var(--adm-warning-tint); color: var(--adm-warning); gap: 4px; }
+.kb-badge-ingesting { background: var(--adm-accent-tint);  color: var(--adm-accent);  gap: 4px; }
+.kb-badge-ingested  { background: var(--adm-success-tint); color: var(--adm-success); gap: 4px; }
+.kb-badge-failed    { background: var(--adm-danger-tint);  color: var(--adm-danger);  gap: 4px; }
+
+/* Per-row ingest progress bar */
+.kb-status-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 130px;
+}
+
+.kb-progress-track {
+  height: 4px;
+  background: var(--adm-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.kb-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.kb-progress-fill--pending   { width: 0%;   background: var(--adm-warning); }
+.kb-progress-fill--ingested  { width: 100%; background: var(--adm-success); }
+.kb-progress-fill--failed    { width: 100%; background: var(--adm-danger);  }
+.kb-progress-fill--ingesting {
+  width: 40%;
+  background: var(--adm-accent);
+  animation: kb-indeterminate 1.4s ease-in-out infinite;
+}
+
+@keyframes kb-indeterminate {
+  0%   { transform: translateX(-200%); width: 40%; }
+  60%  { transform: translateX(250%);  width: 40%; }
+  100% { transform: translateX(250%);  width: 40%; }
+}
+
+.kb-spin {
+  animation: kb-rotate 1s linear infinite;
+}
+
+@keyframes kb-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
 
 .adm-badge {
   display: inline-flex;
   align-items: center;
+}
+
+/* Staged file queue panel */
+.kb-staged-panel {
+  border: 1px solid var(--adm-border);
+  border-radius: 10px;
+  background: var(--adm-card);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.kb-staged-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--adm-border);
+  background: var(--adm-bg);
+}
+
+.kb-staged-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--adm-text);
+}
+
+.kb-staged-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kb-staged-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kb-staged-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--adm-border);
+  font-size: 13px;
+}
+
+.kb-staged-item:last-child {
+  border-bottom: none;
+}
+
+.kb-staged-name {
+  flex: 1;
+  color: var(--adm-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kb-staged-size {
+  color: var(--adm-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.kb-staged-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--adm-text-sub);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kb-staged-remove:hover:not(:disabled) {
+  background: var(--adm-danger-tint);
+  color: var(--adm-danger);
+}
+
+.kb-staged-remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Processing status bar */
+.kb-processing-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--adm-accent-tint);
+  color: var(--adm-accent);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 20px;
 }
 
 /* Documents page — uploader group header */

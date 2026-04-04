@@ -210,12 +210,22 @@ export interface DocumentListItem {
   ingested_at: string | null;
 }
 
-export interface DocumentUploadResponse {
+export interface DocumentUploadResult {
+  filename: string;
+  success: boolean;
+  id?: number;
+  file_size?: number;
+  ingest_status?: IngestStatus;
+  uploaded_at?: string;
+  error?: string;
+}
+
+export interface IngestResult {
   id: number;
   filename: string;
-  file_size: number;
-  ingest_status: IngestStatus;
-  uploaded_at: string;
+  success: boolean;
+  ingest_status?: IngestStatus;
+  error?: string;
 }
 
 export async function apiListDocuments(token: string): Promise<DocumentListItem[]> {
@@ -225,26 +235,27 @@ export async function apiListDocuments(token: string): Promise<DocumentListItem[
   return handleResponse<DocumentListItem[]>(res, 'Failed to fetch documents');
 }
 
-export async function apiUploadDocument(
+export async function apiUploadDocuments(
   token: string,
-  file: File,
-): Promise<DocumentUploadResponse> {
+  files: File[],
+): Promise<DocumentUploadResult[]> {
   const form = new FormData();
-  form.append('file', file);
+  for (const file of files) form.append('files', file);
   const res = await fetch(`${BASE_URL}/rag/documents`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
-  return handleResponse<DocumentUploadResponse>(res, 'Failed to upload document');
+  return handleResponse<DocumentUploadResult[]>(res, 'Failed to upload documents');
 }
 
-export async function apiIngestDocument(token: string, id: number): Promise<void> {
-  const res = await fetch(`${BASE_URL}/rag/documents/${id}/ingest`, {
+export async function apiIngestDocuments(token: string, ids: number[]): Promise<IngestResult[]> {
+  const res = await fetch(`${BASE_URL}/rag/documents/ingest`, {
     method: 'POST',
     headers: authHeaders(token),
+    body: JSON.stringify({ document_ids: ids }),
   });
-  await handleResponse<unknown>(res, 'Failed to ingest document');
+  return handleResponse<IngestResult[]>(res, 'Failed to ingest documents');
 }
 
 export async function apiDeleteDocument(token: string, id: number): Promise<void> {
