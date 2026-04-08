@@ -8,6 +8,8 @@ type Section = 'users' | 'knowledge' | 'documents';
 interface Props {
   activeSection: Section;
   onSectionChange: (s: Section) => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 function getInitials(email: string): string {
@@ -17,7 +19,7 @@ function getInitials(email: string): string {
   return local.slice(0, 2).toUpperCase();
 }
 
-const AdminSidebar: React.FC<Props> = ({ activeSection, onSectionChange }) => {
+const AdminSidebar: React.FC<Props> = ({ activeSection, onSectionChange, mobileOpen, onMobileClose }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -31,7 +33,12 @@ const AdminSidebar: React.FC<Props> = ({ activeSection, onSectionChange }) => {
 
   return (
     <>
-    <aside className="adm-sidebar">
+      <div
+        className={`adm-mobile-overlay${mobileOpen ? ' active' : ''}`}
+        onClick={onMobileClose}
+        aria-hidden="true"
+      />
+      <aside className={`adm-sidebar${mobileOpen ? ' adm-sidebar--open' : ''}`}>
       {/* Logo */}
       <div className="adm-logo-section">
         <div className="adm-logo">

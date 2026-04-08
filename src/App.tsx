@@ -6,7 +6,8 @@ import UserDashboard from './pages/user/UserDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, isInitializing } = useAuth();
+  if (isInitializing) return null; // wait until localStorage is checked
   if (user) return <Navigate to={user.role === 'admin' ? '/admin/dashboard' : '/dashboard'} replace />;
   return <>{children}</>;
 };

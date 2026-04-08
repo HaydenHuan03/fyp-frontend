@@ -12,8 +12,9 @@ const ROLE_HOME: Record<UserRole, string> = {
 };
 
 const ProtectedRoute: React.FC<Props> = ({ children, role }) => {
-  const { user } = useAuth();
+  const { user, isInitializing } = useAuth();
 
+  if (isInitializing) return null; // wait until localStorage is checked
   if (!user) return <Navigate to="/" replace />;
 
   // Authenticated but wrong role → send to their own dashboard

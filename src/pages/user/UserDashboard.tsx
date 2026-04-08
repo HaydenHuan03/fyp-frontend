@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip } from 'lucide-react';
+import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip, Menu } from 'lucide-react';
 import {
   apiListConversations,
   apiCreateConversation,
+  apiCreateCaseConversation,
+  apiUploadCaseDocument,
   apiDeleteConversation,
   apiGetConversationMessages,
   WS_BASE_URL,
@@ -20,13 +22,13 @@ interface Message {
 
 interface Session {
   id: number;
+  case_id: string | null;
   title: string;
   messages: Message[];
   loaded: boolean;
 }
 
-let _msgId = 0;
-function uid() { return `${++_msgId}`; }
+function uid() { return `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
 
 function shortSource(s: string) {
   return s.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
@@ -39,14 +41,17 @@ const SUGGESTIONS = [
 ];
 
 const UserDashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, getValidAccessToken } = useAuth();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [attachedFile, setAttachedFile] = useState<{ name: string; content: string } | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,6 +65,7 @@ const UserDashboard: React.FC = () => {
       .then(convs => {
         setSessions(convs.map(c => ({
           id: c.id,
+          case_id: c.case_id,
           title: c.title,
           messages: [],
           loaded: false,
@@ -112,6 +118,7 @@ const UserDashboard: React.FC = () => {
   const startNewChat = () => {
     setActiveId(null);
     setInput('');
+    setSidebarOpen(false);
     setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
@@ -132,21 +139,14 @@ const UserDashboard: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const content = ev.target?.result as string;
-      setAttachedFile({ name: file.name, content });
-    };
-    reader.readAsText(file);
+    setAttachedFile(file);
     e.target.value = '';
   };
 
   const send = async (question: string) => {
     if (!question.trim() || busy) return;
     const currentFile = attachedFile;
-    const fullQuestion = currentFile
-      ? `[Attached file: ${currentFile.name}]\n\n${currentFile.content}\n\n---\n\n${question}`
-      : question;
+    setUploadError('');
     setBusy(true);
     setInput('');
     setAttachedFile(null);
@@ -157,21 +157,38 @@ const UserDashboard: React.FC = () => {
     // Create conversation on first message if none active
     let sessionId = activeId;
     if (!sessionId) {
-      let conv;
+      const title = question.slice(0, 50) + (question.length > 50 ? '…' : '');
       try {
-        conv = await apiCreateConversation(
-          user!.accessToken,
-          (currentFile ? `[${currentFile.name}] ` : '') + question.slice(0, 50) + (question.length > 50 ? '…' : ''),
-        );
-      } catch {
+        if (currentFile) {
+          // Upload PDF → create a case-linked conversation
+          setUploading(true);
+          const caseId = crypto.randomUUID();
+          await apiUploadCaseDocument(user!.accessToken, caseId, currentFile);
+          setUploading(false);
+          const conv = await apiCreateCaseConversation(
+            user!.accessToken,
+            caseId,
+            `[${currentFile.name}] ${title}`,
+          );
+          setSessions(prev => [{
+            id: conv.id, case_id: caseId, title: conv.title, messages: [], loaded: true,
+          }, ...prev]);
+          setActiveId(conv.id);
+          sessionId = conv.id;
+        } else {
+          const conv = await apiCreateConversation(user!.accessToken, title);
+          setSessions(prev => [{
+            id: conv.id, case_id: null, title: conv.title, messages: [], loaded: true,
+          }, ...prev]);
+          setActiveId(conv.id);
+          sessionId = conv.id;
+        }
+      } catch (err) {
+        setUploading(false);
         setBusy(false);
+        setUploadError(err instanceof Error ? err.message : 'Failed to upload file. Please try again.');
         return;
       }
-      setSessions(prev => [{
-        id: conv.id, title: conv.title, messages: [], loaded: true,
-      }, ...prev]);
-      setActiveId(conv.id);
-      sessionId = conv.id;
     }
 
     const userMsgId = uid();
@@ -181,10 +198,24 @@ const UserDashboard: React.FC = () => {
       ...s,
       messages: [
         ...s.messages,
-        { id: userMsgId, role: 'user' as const, content: question + (currentFile ? ` [${currentFile.name}]` : '') },
+        {
+          id: userMsgId,
+          role: 'user' as const,
+          content: question + (currentFile ? ` [${currentFile.name}]` : ''),
+        },
         { id: aiMsgId, role: 'assistant' as const, content: '', streaming: true },
       ],
     }));
+
+    // Get a fresh (non-expired) token before opening the WebSocket.
+    let wsToken: string;
+    try {
+      wsToken = await getValidAccessToken();
+    } catch {
+      window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
+      setBusy(false);
+      return;
+    }
 
     try {
       const ws = new WebSocket(`${WS_BASE_URL}/chat/ws/${sessionId}`);
@@ -193,10 +224,10 @@ const UserDashboard: React.FC = () => {
         ws.onerror = () => reject(new Error('WebSocket connection failed'));
 
         ws.onopen = () => {
-          // Step 1: authenticate
-          ws.send(JSON.stringify({ token: user!.accessToken }));
-          // Step 2: send question
-          ws.send(JSON.stringify({ question: fullQuestion }));
+          // Step 1: authenticate with a fresh token
+          ws.send(JSON.stringify({ token: wsToken }));
+          // Step 2: send question (file content is retrieved server-side via RAG)
+          ws.send(JSON.stringify({ question }));
 
           ws.onmessage = (event: MessageEvent) => {
             let data: { type: string; content?: string; sources?: string[]; detail?: string };
@@ -230,13 +261,14 @@ const UserDashboard: React.FC = () => {
           };
         };
       });
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'An error occurred. Please try again.';
       setSessions(prev => prev.map(s => s.id !== sessionId ? s : {
         ...s,
         messages: s.messages.map(m =>
           m.id !== aiMsgId ? m : {
             ...m,
-            content: 'An error occurred. Please try again.',
+            content: errMsg,
             streaming: false,
           }
         ),
@@ -262,8 +294,15 @@ const UserDashboard: React.FC = () => {
   return (
     <div className="ch-root">
 
+      {/* ── Mobile sidebar overlay ── */}
+      <div
+        className={`ch-sidebar-overlay${sidebarOpen ? ' active' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
       {/* ── Sidebar ── */}
-      <aside className="ch-sidebar" aria-label="Chat navigation">
+      <aside className={`ch-sidebar${sidebarOpen ? ' ch-sidebar--open' : ''}`} aria-label="Chat navigation">
         <div className="ch-sidebar-head">
           <div className="ch-brand">
             <div className="ch-brand-icon" aria-hidden="true">
@@ -289,7 +328,7 @@ const UserDashboard: React.FC = () => {
                 <button
                   key={s.id}
                   className={`ch-session-item${s.id === activeId ? ' active' : ''}`}
-                  onClick={() => selectConversation(s.id)}
+                  onClick={() => { selectConversation(s.id); setSidebarOpen(false); }}
                   aria-current={s.id === activeId ? 'page' : undefined}
                 >
                   <MessageSquare size={12} aria-hidden="true" />
@@ -326,6 +365,23 @@ const UserDashboard: React.FC = () => {
 
       {/* ── Main ── */}
       <main className="ch-main">
+
+        {/* Mobile header */}
+        <div className="ch-mobile-header">
+          <button
+            className="ch-mobile-toggle"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open navigation"
+          >
+            <Menu size={18} />
+          </button>
+          <div className="ch-mobile-header-brand">
+            <div className="ch-brand-icon" aria-hidden="true">
+              <Scale size={14} color="#fff" strokeWidth={2.2} />
+            </div>
+            <span className="ch-mobile-brand-name">FinGuardMY</span>
+          </div>
+        </div>
 
         {/* Empty state */}
         {(!activeSession || activeSession.messages.length === 0) && (
@@ -386,7 +442,25 @@ const UserDashboard: React.FC = () => {
 
         {/* Input */}
         <div className="ch-input-area">
-          {attachedFile && (
+          {uploadError && (
+            <div className="ch-file-chip" style={{ background: '#fef2f2', borderColor: '#fca5a5', color: '#dc2626' }}>
+              <span className="ch-file-chip-name">{uploadError}</span>
+              <button
+                className="ch-file-chip-remove"
+                onClick={() => setUploadError('')}
+                aria-label="Dismiss error"
+                style={{ color: '#dc2626' }}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          )}
+          {uploading && (
+            <div className="ch-file-chip">
+              <span className="ch-file-chip-name">Uploading…</span>
+            </div>
+          )}
+          {!uploading && attachedFile && (
             <div className="ch-file-chip">
               <Paperclip size={11} />
               <span className="ch-file-chip-name">{attachedFile.name}</span>
@@ -403,7 +477,7 @@ const UserDashboard: React.FC = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.csv,.md,.json,.log"
+              accept=".pdf"
               style={{ display: 'none' }}
               onChange={handleFileChange}
             />
@@ -412,7 +486,7 @@ const UserDashboard: React.FC = () => {
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
               aria-label="Attach file"
-              title="Attach a file (.txt, .csv, .md, .json)"
+              title="Attach a case PDF to analyse"
             >
               <Paperclip size={15} />
             </button>

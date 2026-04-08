@@ -17,9 +17,10 @@ function formatDate(iso: string): string {
 
 const StatusBadge: React.FC<{ status: IngestStatus }> = ({ status }) => {
   const map: Record<IngestStatus, { label: string; cls: string; icon: React.ReactNode }> = {
-    pending:  { label: 'Pending',  cls: 'kb-badge-pending',  icon: <Clock size={11} /> },
-    ingested: { label: 'Ingested', cls: 'kb-badge-ingested', icon: <CheckCircle size={11} /> },
-    failed:   { label: 'Failed',   cls: 'kb-badge-failed',   icon: <AlertCircle size={11} /> },
+    pending:   { label: 'Pending',   cls: 'kb-badge-pending',   icon: <Clock size={11} /> },
+    ingesting: { label: 'Ingesting', cls: 'kb-badge-pending',   icon: <Clock size={11} /> },
+    ingested:  { label: 'Ingested',  cls: 'kb-badge-ingested',  icon: <CheckCircle size={11} /> },
+    failed:    { label: 'Failed',    cls: 'kb-badge-failed',    icon: <AlertCircle size={11} /> },
   };
   const { label, cls, icon } = map[status];
   return <span className={`adm-badge ${cls}`}>{icon}{label}</span>;

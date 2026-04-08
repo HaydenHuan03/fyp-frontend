@@ -24,6 +24,21 @@ export async function apiLogin(email: string, password: string): Promise<LoginRe
   return res.json() as Promise<LoginResponseData>;
 }
 
+export async function apiRefreshToken(refreshToken: string): Promise<LoginResponseData> {
+  const res = await fetch(`${BASE_URL}/users/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+  if (!res.ok) {
+    throw new Error('Token refresh failed');
+  }
+
+  return res.json() as Promise<LoginResponseData>;
+}
+
+
 /** Decode JWT payload without verifying signature (verification is done server-side). */
 export function decodeJwtPayload(token: string): Record<string, unknown> {
   const part = token.split('.')[1];
@@ -139,6 +154,7 @@ export async function apiDeleteUser(token: string, id: string): Promise<void> {
 
 export interface Conversation {
   id: number;
+  case_id: string | null;
   title: string;
   created_at: string;
   updated_at: string;
@@ -198,7 +214,7 @@ export const WS_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:80
 
 // ── Knowledge Base (RAG Documents) ──────────────────────────────────────────
 
-export type IngestStatus = 'pending' | 'ingested' | 'failed';
+export type IngestStatus = 'pending' | 'ingesting' | 'ingested' | 'failed';
 
 export interface DocumentListItem {
   id: number;
@@ -272,4 +288,133 @@ export async function apiDeleteDocument(token: string, id: number): Promise<void
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { detail?: string }).detail ?? 'Failed to delete document');
   }
+}
+
+// ── Agent / Case Analysis ────────────────────────────────────────────────────
+
+export type ReportStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface AnalyseStarted {
+  report_id: string;
+  status: ReportStatus;
+}
+
+export interface ReportStatusResponse {
+  report_id: string;
+  case_id: string;
+  status: ReportStatus;
+  generated_at: string;
+  completed_at: string | null;
+}
+
+export interface DetectedPattern {
+  pattern: string;
+  description: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface ApplicableLaw {
+  law: string;
+  section: string;
+  text: string;
+  relevance: string;
+}
+
+export interface PrecedentCase {
+  case: string;
+  court: string;
+  excerpt: string;
+  outcome: string;
+}
+
+export interface ReportContent {
+  case_summary: string;
+  detected_patterns: DetectedPattern[];
+  applicable_laws: ApplicableLaw[];
+  precedent_cases: PrecedentCase[];
+  recommended_actions: string[];
+}
+
+export interface ReportResponse {
+  report_id: string;
+  case_id: string;
+  status: ReportStatus;
+  content: ReportContent | null;
+  laws_cited: string[] | null;
+  precedents: string[] | null;
+  generated_at: string;
+}
+
+export interface UploadResponse {
+  case_id: string;
+  filename: string;
+  chunks_ingested: number;
+}
+
+/** Upload a case PDF without triggering analysis. */
+export async function apiUploadCaseDocument(
+  token: string,
+  caseId: string,
+  file: File,
+): Promise<UploadResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  return handleResponse<UploadResponse>(res, 'Failed to upload case document');
+}
+
+/** Upload a case PDF and trigger agentic analysis. */
+export async function apiAnalyseCase(
+  token: string,
+  caseId: string,
+  file: File,
+): Promise<AnalyseStarted> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/analyse`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  return handleResponse<AnalyseStarted>(res, 'Failed to start analysis');
+}
+
+/** Poll the status of the latest analysis for a case. */
+export async function apiGetCaseStatus(
+  token: string,
+  caseId: string,
+): Promise<ReportStatusResponse> {
+  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/status`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<ReportStatusResponse>(res, 'Failed to fetch case status');
+}
+
+/** Fetch the completed analysis report for a case. */
+export async function apiGetCaseReport(
+  token: string,
+  caseId: string,
+): Promise<ReportResponse> {
+  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/report`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<ReportResponse>(res, 'Failed to fetch case report');
+}
+
+/** Create a chat conversation linked to a specific case. */
+export async function apiCreateCaseConversation(
+  token: string,
+  caseId: string,
+  title: string,
+): Promise<Conversation> {
+  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/conversations`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ title }),
+  });
+  return handleResponse<Conversation>(res, 'Failed to create case conversation');
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader, X } from 'lucide-react';
+import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   apiListDocuments,
@@ -25,22 +25,19 @@ function formatDate(iso: string): string {
   });
 }
 
-const StatusCell: React.FC<{ status: IngestStatus; isIngesting: boolean }> = ({ status, isIngesting }) => {
-  type BadgeKey = IngestStatus | 'ingesting';
-  const map: Record<BadgeKey, { label: string; cls: string; icon: React.ReactNode }> = {
+const StatusCell: React.FC<{ status: IngestStatus }> = ({ status }) => {
+  const map: Record<IngestStatus, { label: string; cls: string; icon: React.ReactNode }> = {
     pending:   { label: 'Pending',    cls: 'kb-badge-pending',   icon: <Clock size={11} /> },
     ingesting: { label: 'Ingesting…', cls: 'kb-badge-ingesting', icon: <Loader size={11} className="kb-spin" /> },
     ingested:  { label: 'Ingested',   cls: 'kb-badge-ingested',  icon: <CheckCircle size={11} /> },
     failed:    { label: 'Failed',     cls: 'kb-badge-failed',    icon: <AlertCircle size={11} /> },
   };
-  const key: BadgeKey = isIngesting ? 'ingesting' : status;
-  const { label, cls, icon } = map[key];
-  const fillCls = isIngesting ? 'kb-progress-fill--ingesting' : `kb-progress-fill--${status}`;
+  const { label, cls, icon } = map[status];
   return (
     <div className="kb-status-cell">
       <span className={`adm-badge ${cls}`}>{icon}{label}</span>
       <div className="kb-progress-track">
-        <div className={`kb-progress-fill ${fillCls}`} />
+        <div className={`kb-progress-fill kb-progress-fill--${status}`} />
       </div>
     </div>
   );
@@ -53,7 +50,7 @@ const KnowledgeBase: React.FC = () => {
   const [dragging, setDragging] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [ingestingIds, setIngestingIds] = useState<Set<number>>(new Set());
+  const [reIngestingId, setReIngestingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +74,14 @@ const KnowledgeBase: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  // Poll every 4 s while any document is still pending or ingesting.
+  useEffect(() => {
+    const hasActive = docs.some(d => d.ingest_status === 'pending' || d.ingest_status === 'ingesting');
+    if (!hasActive) return;
+    const id = setInterval(load, 4000);
+    return () => clearInterval(id);
+  }, [docs, load]);
+
   const stageFiles = (incoming: File[]) => {
     const pdfs = incoming.filter(f => f.name.toLowerCase().endsWith('.pdf'));
     const rejected = incoming.length - pdfs.length;
@@ -84,7 +89,12 @@ const KnowledgeBase: React.FC = () => {
     if (!pdfs.length) return;
     setStagedFiles(prev => {
       const existing = new Set(prev.map(f => f.name));
-      const deduped = pdfs.filter(f => !existing.has(f.name));
+      const seen = new Set<string>();
+      const deduped = pdfs.filter(f => {
+        if (existing.has(f.name) || seen.has(f.name)) return false;
+        seen.add(f.name);
+        return true;
+      });
       return [...prev, ...deduped];
     });
   };
@@ -99,36 +109,35 @@ const KnowledgeBase: React.FC = () => {
     setStagedFiles([]);
     setUploading(true);
 
-    let uploadedIds: number[] = [];
     try {
       const results = await apiUploadDocuments(user!.accessToken, files);
       const succeeded = results.filter(r => r.success);
       const failed = results.filter(r => !r.success);
-      if (succeeded.length) toast(`${succeeded.length} file(s) uploaded. Ingesting…`, 'success');
-      failed.forEach(r => toast(`"${r.filename}": ${r.error}`, 'error'));
-      uploadedIds = succeeded.map(r => r.id!);
+      if (succeeded.length) toast(`${succeeded.length} file(s) uploaded. Ingestion running in background…`, 'success');
+      failed.forEach(r => toast(`"${r.filename}": ${r.error ?? 'Upload failed'}`, 'error'));
       await load();
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Upload failed', 'error');
+    } finally {
       setUploading(false);
-      return;
     }
-    setUploading(false);
+  };
 
-    if (!uploadedIds.length) return;
-    setIngestingIds(new Set(uploadedIds));
+  const handleReIngest = async (id: number, filename: string) => {
+    setReIngestingId(id);
     try {
-      const results = await apiIngestDocuments(user!.accessToken, uploadedIds);
-      const succeeded = results.filter(r => r.success);
-      const failed = results.filter(r => !r.success);
-      if (succeeded.length) toast(`${succeeded.length} file(s) ingested successfully.`, 'success');
-      failed.forEach(r => toast(`"${r.filename}": ${r.error}`, 'error'));
+      const results = await apiIngestDocuments(user!.accessToken, [id]);
+      const result = results[0];
+      if (result?.success) {
+        toast(`"${filename}" re-ingestion started.`, 'success');
+      } else {
+        toast(`"${filename}": ${result?.error ?? 'Re-ingestion failed'}`, 'error');
+      }
       await load();
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Ingestion failed', 'error');
-      await load();
+      toast(e instanceof Error ? e.message : 'Re-ingestion failed', 'error');
     } finally {
-      setIngestingIds(new Set());
+      setReIngestingId(null);
     }
   };
 
@@ -160,7 +169,7 @@ const KnowledgeBase: React.FC = () => {
   const total    = docs.length;
   const ingested = docs.filter(d => d.ingest_status === 'ingested').length;
   const pending  = docs.filter(d => d.ingest_status === 'pending').length;
-  const busy     = uploading || ingestingIds.size > 0;
+  const busy     = uploading;
 
   return (
     <div>
@@ -281,7 +290,7 @@ const KnowledgeBase: React.FC = () => {
       {busy && (
         <div className="kb-processing-bar">
           <Loader size={14} className="kb-spin" />
-          {uploading ? 'Uploading files…' : `Ingesting ${ingestingIds.size} file(s) into knowledge base…`}
+          Uploading files…
         </div>
       )}
 
@@ -330,9 +339,22 @@ const KnowledgeBase: React.FC = () => {
                     <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
                       {formatDate(doc.uploaded_at)}
                     </td>
-                    <td><StatusCell status={doc.ingest_status} isIngesting={ingestingIds.has(doc.id)} /></td>
+                    <td><StatusCell status={doc.ingest_status} /></td>
                     <td>
                       <div className="adm-row-actions">
+                        {doc.ingest_status === 'failed' && (
+                          <button
+                            className="adm-row-btn"
+                            title="Re-ingest document"
+                            disabled={reIngestingId === doc.id}
+                            onClick={() => handleReIngest(doc.id, doc.filename)}
+                            aria-label={`Re-ingest ${doc.filename}`}
+                          >
+                            {reIngestingId === doc.id
+                              ? <Loader size={14} className="kb-spin" />
+                              : <RefreshCw size={14} />}
+                          </button>
+                        )}
                         <button
                           className="adm-row-btn adm-row-btn--danger"
                           title="Delete document"

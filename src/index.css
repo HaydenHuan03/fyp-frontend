@@ -2223,3 +2223,269 @@ input:-webkit-autofill:focus {
   margin-top: 8px;
   line-height: 1.4;
 }
+
+/* ─────────────────────────────────────────────
+   Admin — Mobile Responsive
+───────────────────────────────────────────── */
+
+.adm-mobile-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--adm-text-muted);
+  padding: 6px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.adm-mobile-menu-btn:hover {
+  background: var(--adm-main-bg);
+  color: var(--adm-text);
+}
+
+.adm-mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 99;
+}
+
+.adm-mobile-overlay.active {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .adm-mobile-menu-btn {
+    display: flex;
+  }
+
+  .adm-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 100;
+  }
+
+  .adm-sidebar.adm-sidebar--open {
+    transform: translateX(0);
+  }
+
+  .adm-content {
+    margin-left: 0;
+  }
+
+  .adm-topbar {
+    padding: 0 16px;
+    gap: 10px;
+  }
+
+  .adm-topbar-right {
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  .adm-topbar-right .adm-admin-badge {
+    display: none;
+  }
+
+  .adm-main {
+    padding: 16px;
+  }
+
+  .adm-stats {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .adm-page-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .adm-page-header .adm-btn-primary {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .adm-table-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .adm-search-input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .adm-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .adm-modal {
+    padding: 20px 18px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .adm-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .adm-form-grid .full-width {
+    grid-column: span 1;
+  }
+
+  .adm-toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Chat — Mobile Responsive
+───────────────────────────────────────────── */
+
+.ch-mobile-header {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.ch-mobile-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ch-mobile-brand-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.2px;
+}
+
+.ch-mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  padding: 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.ch-mobile-toggle:hover {
+  color: #1e293b;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.ch-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 99;
+}
+
+.ch-sidebar-overlay.active {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .ch-mobile-header {
+    display: flex;
+  }
+
+  .ch-mobile-toggle {
+    display: flex;
+  }
+
+  .ch-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .ch-sidebar.ch-sidebar--open {
+    transform: translateX(0);
+  }
+
+  .ch-empty {
+    padding: 20px 16px 28px;
+  }
+
+  .ch-empty-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 14px;
+  }
+
+  .ch-empty-title {
+    font-size: 18px;
+  }
+
+  .ch-empty-sub {
+    font-size: 12.5px;
+    margin-bottom: 20px;
+  }
+
+  .ch-suggestions {
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 100%;
+  }
+
+  .ch-suggestion {
+    border-radius: 10px;
+    text-align: left;
+    padding: 10px 14px;
+  }
+
+  .ch-messages {
+    padding: 16px 12px;
+  }
+
+  .ch-msg-row {
+    max-width: 100%;
+  }
+
+  .ch-bubble {
+    max-width: calc(100vw - 72px);
+    font-size: 13px;
+    padding: 10px 13px;
+  }
+
+  .ch-input-area {
+    padding: 8px 12px 12px;
+  }
+
+  .ch-input-note {
+    font-size: 10px;
+  }
+
+  .ch-logout-modal {
+    width: calc(100% - 32px);
+  }
+}
