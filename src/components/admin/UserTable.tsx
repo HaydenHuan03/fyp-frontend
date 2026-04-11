@@ -60,67 +60,117 @@ const UserTable: React.FC<Props> = ({
   }
 
   return (
-    <div className="adm-table-wrap">
-      <table className="adm-table">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            <SkeletonRows />
-          ) : (
-            users.map(user => (
-              <tr key={user.id}>
-                <td>
-                  <div className="adm-user-cell">
-                    <div className={`adm-row-avatar adm-row-avatar--${user.role}`}>
-                      {getInitials(user.full_name, user.email)}
+    <>
+      {/* Desktop table */}
+      <div className="adm-table-wrap adm-hide-mobile">
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <SkeletonRows />
+            ) : (
+              users.map(user => (
+                <tr key={user.id}>
+                  <td>
+                    <div className="adm-user-cell">
+                      <div className={`adm-row-avatar adm-row-avatar--${user.role}`}>
+                        {getInitials(user.full_name, user.email)}
+                      </div>
+                      <div>
+                        <div className="adm-row-name">{user.full_name || '—'}</div>
+                        <div className="adm-row-email">{user.email}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="adm-row-name">{user.full_name || '—'}</div>
-                      <div className="adm-row-email">{user.email}</div>
+                  </td>
+                  <td>
+                    <span className={`adm-badge adm-badge-${user.role}`}>
+                      {user.role === 'admin' ? 'Admin' : 'User'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`adm-badge adm-badge-${user.is_active ? 'active' : 'suspended'}`}>
+                      {user.is_active ? 'Active' : 'Suspended'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="adm-row-actions">
+                      <button
+                        className="adm-row-btn"
+                        onClick={() => onEdit(user)}
+                        title="Edit user"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        className="adm-row-btn adm-row-btn--danger"
+                        onClick={() => onDelete(user)}
+                        title="Delete user"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                  </div>
-                </td>
-                <td>
-                  <span className={`adm-badge adm-badge-${user.role}`}>
-                    {user.role === 'admin' ? 'Admin' : 'User'}
-                  </span>
-                </td>
-                <td>
-                  <span className={`adm-badge adm-badge-${user.is_active ? 'active' : 'suspended'}`}>
-                    {user.is_active ? 'Active' : 'Suspended'}
-                  </span>
-                </td>
-                <td>
-                  <div className="adm-row-actions">
-                    <button
-                      className="adm-row-btn"
-                      onClick={() => onEdit(user)}
-                      title="Edit user"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      className="adm-row-btn adm-row-btn--danger"
-                      onClick={() => onDelete(user)}
-                      title="Delete user"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="adm-mobile-cards adm-show-mobile">
+        {loading ? (
+          [1, 2, 3].map(i => (
+            <div key={i} className="adm-mobile-card">
+              <div className="adm-mobile-card-header">
+                <div className="adm-skeleton" style={{ width: '30px', height: '30px', borderRadius: '50%' }} />
+                <div style={{ flex: 1 }}>
+                  <div className="adm-skeleton" style={{ width: '120px', marginBottom: '5px' }} />
+                  <div className="adm-skeleton" style={{ width: '160px', height: '11px' }} />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          users.map(user => (
+            <div key={user.id} className="adm-mobile-card">
+              <div className="adm-mobile-card-header">
+                <div className={`adm-row-avatar adm-row-avatar--${user.role}`}>
+                  {getInitials(user.full_name, user.email)}
+                </div>
+                <div className="adm-mobile-card-info">
+                  <div className="adm-row-name">{user.full_name || '—'}</div>
+                  <div className="adm-row-email">{user.email}</div>
+                </div>
+                <div className="adm-row-actions">
+                  <button className="adm-row-btn" onClick={() => onEdit(user)} title="Edit user">
+                    <Edit2 size={14} />
+                  </button>
+                  <button className="adm-row-btn adm-row-btn--danger" onClick={() => onDelete(user)} title="Delete user">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+              <div className="adm-mobile-card-meta">
+                <span className={`adm-badge adm-badge-${user.role}`}>
+                  {user.role === 'admin' ? 'Admin' : 'User'}
+                </span>
+                <span className={`adm-badge adm-badge-${user.is_active ? 'active' : 'suspended'}`}>
+                  {user.is_active ? 'Active' : 'Suspended'}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </>
   );
 };
 

@@ -88,7 +88,8 @@ const Documents: React.FC = () => {
               </span>
             </div>
           </div>
-          <div className="adm-table-wrap">
+          {/* Desktop table */}
+          <div className="adm-table-wrap adm-hide-mobile">
             <table className="adm-table">
               <thead>
                 <tr>
@@ -120,6 +121,33 @@ const Documents: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="adm-mobile-cards adm-show-mobile">
+            {grouped[uploader].map(doc => (
+              <div key={doc.id} className="adm-mobile-card">
+                <div className="adm-mobile-card-header">
+                  <div className="kb-filename-cell" style={{ flex: 1, minWidth: 0 }}>
+                    <div className="kb-file-icon" aria-hidden="true">
+                      <FileText size={14} />
+                    </div>
+                    <span className="kb-filename">{doc.filename}</span>
+                  </div>
+                  <StatusBadge status={doc.ingest_status} />
+                </div>
+                <div className="adm-mobile-card-details">
+                  <div className="adm-mobile-card-detail">
+                    <span className="adm-mobile-card-label">Size</span>
+                    <span className="adm-mobile-card-value">{formatBytes(doc.file_size)}</span>
+                  </div>
+                  <div className="adm-mobile-card-detail">
+                    <span className="adm-mobile-card-label">Uploaded</span>
+                    <span className="adm-mobile-card-value">{formatDate(doc.uploaded_at)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ))}

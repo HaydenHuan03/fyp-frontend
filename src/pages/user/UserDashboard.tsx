@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAuth } from '../../context/AuthContext';
-import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip, Menu } from 'lucide-react';
+import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip, Menu, Square, RefreshCw, Pencil, Check } from 'lucide-react';
 import {
   apiListConversations,
   apiCreateConversation,
   apiCreateCaseConversation,
   apiUploadCaseDocument,
   apiDeleteConversation,
+  apiRenameConversation,
   apiGetConversationMessages,
   WS_BASE_URL,
 } from '../../lib/api';
@@ -52,9 +55,16 @@ const UserDashboard: React.FC = () => {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const wsConvIdRef = useRef<number | null>(null);
+  const currentAiMsgIdRef = useRef<string | null>(null);
+  const sessionIdForWsRef = useRef<number | null>(null);
 
   const activeSession = sessions.find(s => s.id === activeId) ?? null;
 
@@ -87,35 +97,147 @@ const UserDashboard: React.FC = () => {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   };
 
+  // Focus rename input when editing
+  useEffect(() => {
+    if (renamingId !== null) renameInputRef.current?.focus();
+  }, [renamingId]);
+
+  const closeWs = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.onmessage = null;
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+        wsRef.current.close();
+      }
+      wsRef.current = null;
+    }
+    wsConvIdRef.current = null;
+  }, []);
+
+  const connectWs = useCallback(async (conversationId: number): Promise<WebSocket> => {
+    if (wsRef.current && wsConvIdRef.current === conversationId && wsRef.current.readyState === WebSocket.OPEN) {
+      return wsRef.current;
+    }
+
+    closeWs();
+
+    let wsToken: string;
+    try {
+      wsToken = await getValidAccessToken();
+    } catch {
+      window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
+      throw new Error('Authentication failed');
+    }
+
+    const ws = new WebSocket(`${WS_BASE_URL}/chat/ws/${conversationId}`);
+
+    await new Promise<void>((resolve, reject) => {
+      ws.onerror = () => reject(new Error('WebSocket connection failed'));
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ token: wsToken }));
+        resolve();
+      };
+    });
+
+    ws.onmessage = (event: MessageEvent) => {
+      let data: { type: string; content?: string; sources?: string[]; detail?: string };
+      try { data = JSON.parse(event.data as string); } catch { return; }
+
+      if (data.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+        return;
+      }
+
+      const aiMsgId = currentAiMsgIdRef.current;
+      const convId = sessionIdForWsRef.current;
+      if (!aiMsgId || !convId) return;
+
+      if (data.type === 'token') {
+        setSessions(prev => prev.map(s => s.id !== convId ? s : {
+          ...s,
+          messages: s.messages.map(m =>
+            m.id !== aiMsgId ? m : { ...m, content: m.content + (data.content ?? '') }
+          ),
+        }));
+      } else if (data.type === 'done' || data.type === 'stopped') {
+        setSessions(prev => prev.map(s => s.id !== convId ? s : {
+          ...s,
+          messages: s.messages.map(m =>
+            m.id !== aiMsgId ? m : { ...m, sources: data.sources, streaming: false }
+          ),
+        }));
+        currentAiMsgIdRef.current = null;
+        setBusy(false);
+      } else if (data.type === 'error') {
+        setSessions(prev => prev.map(s => s.id !== convId ? s : {
+          ...s,
+          messages: s.messages.map(m =>
+            m.id !== aiMsgId ? m : { ...m, content: data.detail ?? 'An error occurred.', streaming: false }
+          ),
+        }));
+        currentAiMsgIdRef.current = null;
+        setBusy(false);
+      }
+    };
+
+    ws.onclose = (event: CloseEvent) => {
+      const aiMsgId = currentAiMsgIdRef.current;
+      const convId = sessionIdForWsRef.current;
+      if (aiMsgId && convId && event.code !== 1000 && event.code !== 1005) {
+        setSessions(prev => prev.map(s => s.id !== convId ? s : {
+          ...s,
+          messages: s.messages.map(m =>
+            m.id !== aiMsgId ? m : { ...m, content: m.content || 'Connection lost. Please try again.', streaming: false }
+          ),
+        }));
+        currentAiMsgIdRef.current = null;
+        setBusy(false);
+      }
+      wsRef.current = null;
+      wsConvIdRef.current = null;
+    };
+
+    wsRef.current = ws;
+    wsConvIdRef.current = conversationId;
+    return ws;
+  }, [closeWs, getValidAccessToken]);
+
+  useEffect(() => {
+    return () => { closeWs(); };
+  }, [closeWs]);
+
   const selectConversation = useCallback(async (id: number) => {
+    if (wsConvIdRef.current && wsConvIdRef.current !== id) closeWs();
     setActiveId(id);
     setSessions(prev => {
       const s = prev.find(x => x.id === id);
       if (!s || s.loaded) return prev;
-      // Mark as loading so we don't double-fetch
       return prev.map(x => x.id === id ? { ...x, loaded: true } : x);
     });
 
-    // Need to check loaded state before fetch — use local ref to avoid stale closure
     const session = sessions.find(s => s.id === id);
-    if (session?.loaded) return;
+    if (!session?.loaded) {
+      try {
+        const msgs = await apiGetConversationMessages(user!.accessToken, id);
+        setSessions(prev => prev.map(s => s.id !== id ? s : {
+          ...s,
+          loaded: true,
+          messages: msgs.map(m => ({
+            id: String(m.id),
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            sources: m.sources ?? undefined,
+          })),
+        }));
+      } catch { /* leave messages empty */ }
+    }
 
-    try {
-      const msgs = await apiGetConversationMessages(user!.accessToken, id);
-      setSessions(prev => prev.map(s => s.id !== id ? s : {
-        ...s,
-        loaded: true,
-        messages: msgs.map(m => ({
-          id: String(m.id),
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          sources: m.sources ?? undefined,
-        })),
-      }));
-    } catch { /* leave messages empty */ }
-  }, [sessions, user]);
+    connectWs(id).catch(() => { /* will retry on send */ });
+  }, [sessions, user, closeWs, connectWs]);
 
   const startNewChat = () => {
+    closeWs();
     setActiveId(null);
     setInput('');
     setSidebarOpen(false);
@@ -124,6 +246,7 @@ const UserDashboard: React.FC = () => {
 
   const deleteSession = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
+    if (wsConvIdRef.current === id) closeWs();
     try {
       await apiDeleteConversation(user!.accessToken, id);
     } catch { /* ignore */ }
@@ -131,7 +254,25 @@ const UserDashboard: React.FC = () => {
     if (activeId === id) setActiveId(null);
   };
 
+  // ── Rename conversation ──
+  const startRename = (e: React.MouseEvent, id: number, currentTitle: string) => {
+    e.stopPropagation();
+    setRenamingId(id);
+    setRenameValue(currentTitle);
+  };
+
+  const submitRename = async (id: number) => {
+    const trimmed = renameValue.trim();
+    if (!trimmed) { setRenamingId(null); return; }
+    try {
+      await apiRenameConversation(user!.accessToken, id, trimmed);
+      setSessions(prev => prev.map(s => s.id !== id ? s : { ...s, title: trimmed }));
+    } catch { /* ignore */ }
+    setRenamingId(null);
+  };
+
   const handleLogout = () => {
+    closeWs();
     logout();
     navigate('/', { replace: true });
   };
@@ -141,6 +282,55 @@ const UserDashboard: React.FC = () => {
     if (!file) return;
     setAttachedFile(file);
     e.target.value = '';
+  };
+
+  // ── Stop generating ──
+  const stopGenerating = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'stop' }));
+    }
+  };
+
+  // ── Regenerate last response ──
+  const regenerate = async () => {
+    if (busy || !activeId || !activeSession) return;
+    const msgs = activeSession.messages;
+    if (msgs.length < 2) return;
+
+    // Remove the last assistant message from UI
+    const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant');
+    if (!lastAssistant) return;
+
+    const aiMsgId = uid();
+
+    setSessions(prev => prev.map(s => s.id !== activeId ? s : {
+      ...s,
+      messages: [
+        ...s.messages.filter(m => m.id !== lastAssistant.id),
+        { id: aiMsgId, role: 'assistant' as const, content: '', streaming: true },
+      ],
+    }));
+
+    setBusy(true);
+    currentAiMsgIdRef.current = aiMsgId;
+    sessionIdForWsRef.current = activeId;
+
+    try {
+      const ws = await connectWs(activeId);
+      ws.send(JSON.stringify({ type: 'regenerate' }));
+    } catch (err) {
+      const isAuthError = err instanceof Error && err.message === 'Authentication failed';
+      setSessions(prev => prev.map(s => s.id !== activeId ? s : {
+        ...s,
+        messages: isAuthError
+          ? s.messages.filter(m => m.id !== aiMsgId)
+          : s.messages.map(m =>
+              m.id !== aiMsgId ? m : { ...m, content: err instanceof Error ? err.message : 'An error occurred. Please try again.', streaming: false }
+            ),
+      }));
+      currentAiMsgIdRef.current = null;
+      setBusy(false);
+    }
   };
 
   const send = async (question: string) => {
@@ -154,13 +344,11 @@ const UserDashboard: React.FC = () => {
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
     }, 0);
 
-    // Create conversation on first message if none active
     let sessionId = activeId;
     if (!sessionId) {
-      const title = question.slice(0, 50) + (question.length > 50 ? '…' : '');
+      const title = question.slice(0, 50) + (question.length > 50 ? '...' : '');
       try {
         if (currentFile) {
-          // Upload PDF → create a case-linked conversation
           setUploading(true);
           const caseId = crypto.randomUUID();
           await apiUploadCaseDocument(user!.accessToken, caseId, currentFile);
@@ -207,80 +395,24 @@ const UserDashboard: React.FC = () => {
       ],
     }));
 
-    // Get a fresh (non-expired) token before opening the WebSocket.
-    let wsToken: string;
-    try {
-      wsToken = await getValidAccessToken();
-    } catch {
-      window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
-      setBusy(false);
-      return;
-    }
+    currentAiMsgIdRef.current = aiMsgId;
+    sessionIdForWsRef.current = sessionId;
 
     try {
-      const ws = new WebSocket(`${WS_BASE_URL}/chat/ws/${sessionId}`);
-
-      await new Promise<void>((resolve, reject) => {
-        ws.onerror = () => reject(new Error('WebSocket connection failed'));
-
-        ws.onopen = () => {
-          // Step 1: authenticate with a fresh token
-          ws.send(JSON.stringify({ token: wsToken }));
-          // Step 2: send question (file content is retrieved server-side via RAG)
-          ws.send(JSON.stringify({ question }));
-
-          ws.onmessage = (event: MessageEvent) => {
-            let data: { type: string; content?: string; sources?: string[]; detail?: string };
-            try { data = JSON.parse(event.data as string); } catch { return; }
-
-            if (data.type === 'token') {
-              setSessions(prev => prev.map(s => s.id !== sessionId ? s : {
-                ...s,
-                messages: s.messages.map(m =>
-                  m.id !== aiMsgId ? m : { ...m, content: m.content + (data.content ?? '') }
-                ),
-              }));
-            } else if (data.type === 'done') {
-              setSessions(prev => prev.map(s => s.id !== sessionId ? s : {
-                ...s,
-                messages: s.messages.map(m =>
-                  m.id !== aiMsgId ? m : { ...m, sources: data.sources, streaming: false }
-                ),
-              }));
-              ws.close();
-              resolve();
-            } else if (data.type === 'error') {
-              reject(new Error(data.detail ?? 'Unknown error'));
-            }
-          };
-
-          ws.onclose = (event: CloseEvent) => {
-            if (event.code !== 1000 && event.code !== 1005) {
-              reject(new Error(`Connection closed: ${event.reason || event.code}`));
-            }
-          };
-        };
-      });
+      const ws = await connectWs(sessionId);
+      ws.send(JSON.stringify({ question }));
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'An error occurred. Please try again.';
+      const isAuthError = err instanceof Error && err.message === 'Authentication failed';
       setSessions(prev => prev.map(s => s.id !== sessionId ? s : {
         ...s,
-        messages: s.messages.map(m =>
-          m.id !== aiMsgId ? m : {
-            ...m,
-            content: errMsg,
-            streaming: false,
-          }
-        ),
+        messages: isAuthError
+          ? s.messages.filter(m => m.id !== aiMsgId)
+          : s.messages.map(m =>
+              m.id !== aiMsgId ? m : { ...m, content: err instanceof Error ? err.message : 'An error occurred. Please try again.', streaming: false }
+            ),
       }));
-    } finally {
+      currentAiMsgIdRef.current = null;
       setBusy(false);
-      setSessions(prev => prev.map(s => s.id !== sessionId ? s : {
-        ...s,
-        messages: s.messages.map(m =>
-          m.id !== aiMsgId ? m : { ...m, streaming: false }
-        ),
-      }));
     }
   };
 
@@ -290,6 +422,13 @@ const UserDashboard: React.FC = () => {
       send(input);
     }
   };
+
+  // Check if last message is from assistant and not streaming (for regenerate button)
+  const canRegenerate = activeSession
+    && activeSession.messages.length >= 2
+    && !busy
+    && activeSession.messages[activeSession.messages.length - 1]?.role === 'assistant'
+    && !activeSession.messages[activeSession.messages.length - 1]?.streaming;
 
   return (
     <div className="ch-root">
@@ -332,14 +471,50 @@ const UserDashboard: React.FC = () => {
                   aria-current={s.id === activeId ? 'page' : undefined}
                 >
                   <MessageSquare size={12} aria-hidden="true" />
-                  <span className="ch-session-title">{s.title}</span>
-                  <span
-                    className="ch-session-delete"
-                    role="button"
-                    aria-label={`Delete ${s.title}`}
-                    onClick={(e) => deleteSession(e, s.id)}
-                  >
-                    <X size={11} strokeWidth={2.5} aria-hidden="true" />
+                  {renamingId === s.id ? (
+                    <input
+                      ref={renameInputRef}
+                      className="ch-rename-input"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') submitRename(s.id);
+                        if (e.key === 'Escape') setRenamingId(null);
+                      }}
+                      onBlur={() => submitRename(s.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span className="ch-session-title">{s.title}</span>
+                  )}
+                  <span className="ch-session-actions">
+                    {renamingId === s.id ? (
+                      <span
+                        className="ch-session-action"
+                        role="button"
+                        aria-label="Confirm rename"
+                        onClick={(e) => { e.stopPropagation(); submitRename(s.id); }}
+                      >
+                        <Check size={11} strokeWidth={2.5} aria-hidden="true" />
+                      </span>
+                    ) : (
+                      <span
+                        className="ch-session-action"
+                        role="button"
+                        aria-label={`Rename ${s.title}`}
+                        onClick={(e) => startRename(e, s.id, s.title)}
+                      >
+                        <Pencil size={10} strokeWidth={2.5} aria-hidden="true" />
+                      </span>
+                    )}
+                    <span
+                      className="ch-session-action"
+                      role="button"
+                      aria-label={`Delete ${s.title}`}
+                      onClick={(e) => deleteSession(e, s.id)}
+                    >
+                      <X size={11} strokeWidth={2.5} aria-hidden="true" />
+                    </span>
                   </span>
                 </button>
               ))}
@@ -414,7 +589,15 @@ const UserDashboard: React.FC = () => {
                   </div>
                 )}
                 <div className={`ch-bubble ch-bubble-${msg.role}`}>
-                  <span>{msg.content}</span>
+                  {msg.role === 'assistant' ? (
+                    <div className="ch-markdown">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <span>{msg.content}</span>
+                  )}
                   {msg.streaming && !msg.content && (
                     <span className="ch-typing-dots" aria-label="Generating response">
                       <span /><span /><span />
@@ -436,6 +619,15 @@ const UserDashboard: React.FC = () => {
                 </div>
               </div>
             ))}
+            {/* Regenerate button after last assistant message */}
+            {canRegenerate && (
+              <div className="ch-regenerate-row">
+                <button className="ch-regenerate-btn" onClick={regenerate} aria-label="Regenerate response">
+                  <RefreshCw size={13} strokeWidth={2.2} />
+                  Regenerate
+                </button>
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
         )}
@@ -457,7 +649,7 @@ const UserDashboard: React.FC = () => {
           )}
           {uploading && (
             <div className="ch-file-chip">
-              <span className="ch-file-chip-name">Uploading…</span>
+              <span className="ch-file-chip-name">Uploading...</span>
             </div>
           )}
           {!uploading && attachedFile && (
@@ -497,19 +689,29 @@ const UserDashboard: React.FC = () => {
               value={input}
               onChange={e => { setInput(e.target.value); resizeTextarea(); }}
               onKeyDown={onKeyDown}
-              placeholder="Ask about financial crime laws, regulations, or case analysis…"
+              placeholder="Ask about financial crime laws, regulations, or case analysis..."
               disabled={busy}
               aria-label="Message input"
               aria-multiline="true"
             />
-            <button
-              className="ch-send-btn"
-              onClick={() => send(input)}
-              disabled={!input.trim() || busy}
-              aria-label="Send message"
-            >
-              <Send size={15} strokeWidth={2.5} aria-hidden="true" />
-            </button>
+            {busy ? (
+              <button
+                className="ch-stop-btn"
+                onClick={stopGenerating}
+                aria-label="Stop generating"
+              >
+                <Square size={14} fill="currentColor" strokeWidth={0} aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                className="ch-send-btn"
+                onClick={() => send(input)}
+                disabled={!input.trim()}
+                aria-label="Send message"
+              >
+                <Send size={15} strokeWidth={2.5} aria-hidden="true" />
+              </button>
+            )}
           </div>
           <p className="ch-input-note">
             FinGuardMY may make mistakes. Verify important findings with official sources.

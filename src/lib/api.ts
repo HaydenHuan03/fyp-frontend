@@ -184,6 +184,15 @@ export async function apiCreateConversation(token: string, title: string): Promi
   return handleResponse<Conversation>(res, 'Failed to create conversation');
 }
 
+export async function apiRenameConversation(token: string, id: number, title: string): Promise<Conversation> {
+  const res = await fetch(`${BASE_URL}/chat/conversations/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify({ title }),
+  });
+  return handleResponse<Conversation>(res, 'Failed to rename conversation');
+}
+
 export async function apiDeleteConversation(token: string, id: number): Promise<void> {
   const res = await fetch(`${BASE_URL}/chat/conversations/${id}`, {
     method: 'DELETE',

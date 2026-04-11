@@ -307,7 +307,8 @@ const KnowledgeBase: React.FC = () => {
             <p>No documents uploaded yet.</p>
           </div>
         ) : (
-          <div className="adm-table-wrap">
+          <>
+          <div className="adm-table-wrap adm-hide-mobile">
             <table className="adm-table">
               <thead>
                 <tr>
@@ -371,6 +372,64 @@ const KnowledgeBase: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile cards */}
+          <div className="adm-mobile-cards adm-show-mobile">
+            {docs.map(doc => (
+              <div key={doc.id} className="adm-mobile-card">
+                <div className="adm-mobile-card-header">
+                  <div className="kb-filename-cell" style={{ flex: 1, minWidth: 0 }}>
+                    <div className="kb-file-icon" aria-hidden="true">
+                      <FileText size={14} />
+                    </div>
+                    <span className="kb-filename">{doc.filename}</span>
+                  </div>
+                  <div className="adm-row-actions">
+                    {doc.ingest_status === 'failed' && (
+                      <button
+                        className="adm-row-btn"
+                        title="Re-ingest document"
+                        disabled={reIngestingId === doc.id}
+                        onClick={() => handleReIngest(doc.id, doc.filename)}
+                        aria-label={`Re-ingest ${doc.filename}`}
+                      >
+                        {reIngestingId === doc.id
+                          ? <Loader size={14} className="kb-spin" />
+                          : <RefreshCw size={14} />}
+                      </button>
+                    )}
+                    <button
+                      className="adm-row-btn adm-row-btn--danger"
+                      title="Delete document"
+                      disabled={deletingId === doc.id}
+                      onClick={() => handleDelete(doc.id, doc.filename)}
+                      aria-label={`Delete ${doc.filename}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="adm-mobile-card-details">
+                  <div className="adm-mobile-card-detail">
+                    <span className="adm-mobile-card-label">Size</span>
+                    <span className="adm-mobile-card-value">{formatBytes(doc.file_size)}</span>
+                  </div>
+                  <div className="adm-mobile-card-detail">
+                    <span className="adm-mobile-card-label">By</span>
+                    <span className="adm-mobile-card-value">{doc.uploaded_by}</span>
+                  </div>
+                  <div className="adm-mobile-card-detail">
+                    <span className="adm-mobile-card-label">Date</span>
+                    <span className="adm-mobile-card-value">{formatDate(doc.uploaded_at)}</span>
+                  </div>
+                </div>
+                <div className="adm-mobile-card-footer">
+                  <StatusCell status={doc.ingest_status} />
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
         )}
       </div>
 
