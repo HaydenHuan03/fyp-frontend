@@ -91,9 +91,66 @@ function authHeaders(token: string): Record<string, string> {
   };
 }
 
+// ── Auth bridge + fetch interceptor ─────────────────────────────────────────
+// AuthContext registers a refresh callback with this bridge at mount. When any
+// authenticated request hits 401, `authFetch` asks the bridge for a refreshed
+// access token and retries the request once. Concurrent 401s share a single
+// in-flight refresh promise.
+
+interface AuthBridge {
+  /** Refresh the access token and return the new one. */
+  refresh: () => Promise<string>;
+  /** Called when refresh fails — caller should prompt the user to log in. */
+  onUnauthorized: () => void;
+}
+
+let authBridge: AuthBridge | null = null;
+let refreshInFlight: Promise<string> | null = null;
+
+export function registerAuthBridge(bridge: AuthBridge): () => void {
+  authBridge = bridge;
+  return () => {
+    if (authBridge === bridge) authBridge = null;
+  };
+}
+
+function refreshAccessTokenDeduped(): Promise<string> {
+  if (!authBridge) return Promise.reject(new Error('No auth bridge registered'));
+  if (!refreshInFlight) {
+    refreshInFlight = authBridge.refresh().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+async function authFetch(
+  url: string,
+  token: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const send = (accessToken: string) => {
+    const headers = new Headers(init.headers);
+    headers.set('Authorization', `Bearer ${accessToken}`);
+    return fetch(url, { ...init, headers });
+  };
+
+  const first = await send(token);
+  if (first.status !== 401) return first;
+
+  try {
+    const fresh = await refreshAccessTokenDeduped();
+    const retry = await send(fresh);
+    if (retry.status === 401) authBridge?.onUnauthorized();
+    return retry;
+  } catch {
+    authBridge?.onUnauthorized();
+    return first;
+  }
+}
+
 async function handleResponse<T>(res: Response, fallbackMessage: string): Promise<T> {
   if (res.status === 401) {
-    window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
     throw new Error('Session expired. Please log in again.');
   }
   if (!res.ok) {
@@ -104,7 +161,7 @@ async function handleResponse<T>(res: Response, fallbackMessage: string): Promis
 }
 
 export async function apiGetUsers(token: string): Promise<User[]> {
-  const res = await fetch(`${BASE_URL}/users/`, {
+  const res = await authFetch(`${BASE_URL}/users/`, token, {
     headers: authHeaders(token),
   });
   return handleResponse<User[]>(res, 'Failed to fetch users');
@@ -114,7 +171,7 @@ export async function apiCreateUser(
   token: string,
   data: CreateUserPayload,
 ): Promise<User> {
-  const res = await fetch(`${BASE_URL}/users/`, {
+  const res = await authFetch(`${BASE_URL}/users/`, token, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify(data),
@@ -127,7 +184,7 @@ export async function apiUpdateUser(
   id: string,
   data: UpdateUserPayload,
 ): Promise<User> {
-  const res = await fetch(`${BASE_URL}/users/${id}`, {
+  const res = await authFetch(`${BASE_URL}/users/${id}`, token, {
     method: 'PATCH',
     headers: authHeaders(token),
     body: JSON.stringify(data),
@@ -136,12 +193,11 @@ export async function apiUpdateUser(
 }
 
 export async function apiDeleteUser(token: string, id: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/users/${id}`, {
+  const res = await authFetch(`${BASE_URL}/users/${id}`, token, {
     method: 'DELETE',
     headers: authHeaders(token),
   });
   if (res.status === 401) {
-    window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
     throw new Error('Session expired. Please log in again.');
   }
   if (!res.ok) {
@@ -169,14 +225,14 @@ export interface ChatMessage {
 }
 
 export async function apiListConversations(token: string): Promise<Conversation[]> {
-  const res = await fetch(`${BASE_URL}/chat/conversations`, {
+  const res = await authFetch(`${BASE_URL}/chat/conversations`, token, {
     headers: authHeaders(token),
   });
   return handleResponse<Conversation[]>(res, 'Failed to fetch conversations');
 }
 
 export async function apiCreateConversation(token: string, title: string): Promise<Conversation> {
-  const res = await fetch(`${BASE_URL}/chat/conversations`, {
+  const res = await authFetch(`${BASE_URL}/chat/conversations`, token, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ title }),
@@ -185,7 +241,7 @@ export async function apiCreateConversation(token: string, title: string): Promi
 }
 
 export async function apiRenameConversation(token: string, id: number, title: string): Promise<Conversation> {
-  const res = await fetch(`${BASE_URL}/chat/conversations/${id}`, {
+  const res = await authFetch(`${BASE_URL}/chat/conversations/${id}`, token, {
     method: 'PATCH',
     headers: authHeaders(token),
     body: JSON.stringify({ title }),
@@ -194,12 +250,11 @@ export async function apiRenameConversation(token: string, id: number, title: st
 }
 
 export async function apiDeleteConversation(token: string, id: number): Promise<void> {
-  const res = await fetch(`${BASE_URL}/chat/conversations/${id}`, {
+  const res = await authFetch(`${BASE_URL}/chat/conversations/${id}`, token, {
     method: 'DELETE',
     headers: authHeaders(token),
   });
   if (res.status === 401) {
-    window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
     throw new Error('Session expired. Please log in again.');
   }
   if (res.status === 204) return;
@@ -210,7 +265,7 @@ export async function apiDeleteConversation(token: string, id: number): Promise<
 }
 
 export async function apiGetConversationMessages(token: string, id: number): Promise<ChatMessage[]> {
-  const res = await fetch(`${BASE_URL}/chat/conversations/${id}/messages`, {
+  const res = await authFetch(`${BASE_URL}/chat/conversations/${id}/messages`, token, {
     headers: authHeaders(token),
   });
   return handleResponse<ChatMessage[]>(res, 'Failed to fetch messages');
@@ -254,7 +309,7 @@ export interface IngestResult {
 }
 
 export async function apiListDocuments(token: string): Promise<DocumentListItem[]> {
-  const res = await fetch(`${BASE_URL}/rag/documents`, {
+  const res = await authFetch(`${BASE_URL}/rag/documents`, token, {
     headers: authHeaders(token),
   });
   return handleResponse<DocumentListItem[]>(res, 'Failed to fetch documents');
@@ -266,16 +321,15 @@ export async function apiUploadDocuments(
 ): Promise<DocumentUploadResult[]> {
   const form = new FormData();
   for (const file of files) form.append('files', file);
-  const res = await fetch(`${BASE_URL}/rag/documents`, {
+  const res = await authFetch(`${BASE_URL}/rag/documents`, token, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
   return handleResponse<DocumentUploadResult[]>(res, 'Failed to upload documents');
 }
 
 export async function apiIngestDocuments(token: string, ids: number[]): Promise<IngestResult[]> {
-  const res = await fetch(`${BASE_URL}/rag/documents/ingest`, {
+  const res = await authFetch(`${BASE_URL}/rag/documents/ingest`, token, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ document_ids: ids }),
@@ -284,12 +338,11 @@ export async function apiIngestDocuments(token: string, ids: number[]): Promise<
 }
 
 export async function apiDeleteDocument(token: string, id: number): Promise<void> {
-  const res = await fetch(`${BASE_URL}/rag/documents/${id}`, {
+  const res = await authFetch(`${BASE_URL}/rag/documents/${id}`, token, {
     method: 'DELETE',
     headers: authHeaders(token),
   });
   if (res.status === 401) {
-    window.dispatchEvent(new CustomEvent('finguard:unauthorized'));
     throw new Error('Session expired. Please log in again.');
   }
   if (res.status === 204) return;
@@ -368,9 +421,8 @@ export async function apiUploadCaseDocument(
 ): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/upload`, {
+  const res = await authFetch(`${BASE_URL}/agent/cases/${caseId}/upload`, token, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
   return handleResponse<UploadResponse>(res, 'Failed to upload case document');
@@ -384,9 +436,8 @@ export async function apiAnalyseCase(
 ): Promise<AnalyseStarted> {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/analyse`, {
+  const res = await authFetch(`${BASE_URL}/agent/cases/${caseId}/analyse`, token, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
   return handleResponse<AnalyseStarted>(res, 'Failed to start analysis');
@@ -397,7 +448,7 @@ export async function apiGetCaseStatus(
   token: string,
   caseId: string,
 ): Promise<ReportStatusResponse> {
-  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/status`, {
+  const res = await authFetch(`${BASE_URL}/agent/cases/${caseId}/status`, token, {
     headers: authHeaders(token),
   });
   return handleResponse<ReportStatusResponse>(res, 'Failed to fetch case status');
@@ -408,7 +459,7 @@ export async function apiGetCaseReport(
   token: string,
   caseId: string,
 ): Promise<ReportResponse> {
-  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/report`, {
+  const res = await authFetch(`${BASE_URL}/agent/cases/${caseId}/report`, token, {
     headers: authHeaders(token),
   });
   return handleResponse<ReportResponse>(res, 'Failed to fetch case report');
@@ -420,7 +471,7 @@ export async function apiCreateCaseConversation(
   caseId: string,
   title: string,
 ): Promise<Conversation> {
-  const res = await fetch(`${BASE_URL}/agent/cases/${caseId}/conversations`, {
+  const res = await authFetch(`${BASE_URL}/agent/cases/${caseId}/conversations`, token, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ title }),

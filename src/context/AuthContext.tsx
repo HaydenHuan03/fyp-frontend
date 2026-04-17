@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Lock } from 'lucide-react';
-import { apiRefreshToken, roleFromToken } from '../lib/api';
+import { apiRefreshToken, registerAuthBridge, roleFromToken } from '../lib/api';
 
 export type UserRole = 'admin' | 'user';
 
@@ -124,23 +124,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle 401 responses from API calls while the user is logged in.
-  // Try to refresh first; show the modal only if refresh also fails.
+  // Register the fetch interceptor bridge so api.ts can transparently refresh
+  // the access token on 401 and retry the failing request.
+  useEffect(() => {
+    return registerAuthBridge({
+      refresh: async () => {
+        const current = userRef.current;
+        if (!current) throw new Error('Not authenticated');
+        const refreshed = await tryRefresh(current);
+        applyUser(refreshed);
+        return refreshed.accessToken;
+      },
+      onUnauthorized: () => setSessionExpired(true),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fallback for non-fetch code paths (e.g. WebSocket auth failures) that
+  // dispatch `finguard:unauthorized` directly.
   useEffect(() => {
     const handler = async () => {
       const current = userRef.current;
       if (!current) return;
-
       try {
-        // Silently refresh — next API call in the component will succeed.
         const refreshed = await tryRefresh(current);
         applyUser(refreshed);
       } catch {
-        // Refresh also failed — ask the user to log in again.
         setSessionExpired(true);
       }
     };
-
     window.addEventListener('finguard:unauthorized', handler);
     return () => window.removeEventListener('finguard:unauthorized', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
