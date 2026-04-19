@@ -68,7 +68,6 @@ const UserDashboard: React.FC = () => {
 
   const activeSession = sessions.find(s => s.id === activeId) ?? null;
 
-  // Load conversations on mount
   useEffect(() => {
     if (!user) return;
     apiListConversations(user.accessToken)
@@ -84,7 +83,6 @@ const UserDashboard: React.FC = () => {
       .catch(() => { /* ignore — user sees empty sidebar */ });
   }, [user]);
 
-  // Scroll to bottom when messages update
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeSession?.messages]);

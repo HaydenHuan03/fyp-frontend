@@ -98,27 +98,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // On mount: always refresh to validate session against Keycloak.
-  // This ensures that if the backend/Keycloak was restarted (invalidating tokens),
-  // the user is redirected to login rather than being stuck with stale tokens.
+  // On mount: hydrate from storage. If the access token is still valid, render
+  // the app immediately and validate against Keycloak in the background — this
+  // prevents a blank page when the backend is slow (e.g. busy ingesting files).
+  // If the access token is expired, we must wait for the refresh before render.
   useEffect(() => {
+    const stored = readStoredUser();
+
+    if (!stored) {
+      setIsInitializing(false);
+      return;
+    }
+
+    const accessValid = !isTokenExpired(stored.accessToken);
+
+    if (accessValid) {
+      applyUser(stored);
+      setIsInitializing(false);
+      // Fire-and-forget background revalidation.
+      tryRefresh(stored)
+        .then(refreshed => applyUser(refreshed))
+        .catch(() => {
+          // Only force logout if the refresh token itself is clearly dead.
+          if (isTokenExpired(stored.refreshToken)) {
+            clearUser();
+            setUser(null);
+            userRef.current = null;
+          }
+        });
+      return;
+    }
+
     (async () => {
-      const stored = readStoredUser();
-
-      if (!stored) {
-        setIsInitializing(false);
-        return;
-      }
-
-      // Always attempt a refresh to validate the session server-side.
       try {
         const refreshed = await tryRefresh(stored);
         applyUser(refreshed);
       } catch {
-        // Refresh token expired or revoked → force re-login.
         clearUser();
       }
-
       setIsInitializing(false);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps

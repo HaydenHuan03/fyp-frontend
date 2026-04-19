@@ -83,14 +83,17 @@ const KnowledgeBase: React.FC = () => {
   }, [docs, load]);
 
   const stageFiles = (incoming: File[]) => {
-    const pdfs = incoming.filter(f => f.name.toLowerCase().endsWith('.pdf'));
-    const rejected = incoming.length - pdfs.length;
-    if (rejected > 0) toast(`${rejected} file(s) skipped — only PDFs are accepted.`, 'error');
-    if (!pdfs.length) return;
+    const accepted = incoming.filter(f => {
+      const name = f.name.toLowerCase();
+      return name.endsWith('.pdf') || name.endsWith('.json');
+    });
+    const rejected = incoming.length - accepted.length;
+    if (rejected > 0) toast(`${rejected} file(s) skipped — only PDF or JSON files are accepted.`, 'error');
+    if (!accepted.length) return;
     setStagedFiles(prev => {
       const existing = new Set(prev.map(f => f.name));
       const seen = new Set<string>();
-      const deduped = pdfs.filter(f => {
+      const deduped = accepted.filter(f => {
         if (existing.has(f.name) || seen.has(f.name)) return false;
         seen.add(f.name);
         return true;
@@ -177,7 +180,7 @@ const KnowledgeBase: React.FC = () => {
       <div className="adm-page-header">
         <div>
           <div className="adm-page-title">Knowledge Base</div>
-          <div className="adm-page-sub">Manage PDF documents ingested into the RAG knowledge base.</div>
+          <div className="adm-page-sub">Manage PDF and JSON documents ingested into the RAG knowledge base.</div>
         </div>
       </div>
 
@@ -221,13 +224,13 @@ const KnowledgeBase: React.FC = () => {
         onClick={() => !busy && fileInputRef.current?.click()}
         role="button"
         tabIndex={0}
-        aria-label="Select PDFs — click or drag and drop"
+        aria-label="Select PDF or JSON files — click or drag and drop"
         onKeyDown={e => e.key === 'Enter' && !busy && fileInputRef.current?.click()}
       >
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,.json,application/pdf,application/json"
           multiple
           style={{ display: 'none' }}
           onChange={handleFileInput}
@@ -236,9 +239,9 @@ const KnowledgeBase: React.FC = () => {
           <Upload size={22} color={dragging ? 'var(--adm-accent)' : 'var(--adm-text-sub)'} />
         </div>
         <div className="kb-dropzone-text">
-          {dragging ? 'Drop to add' : 'Click or drag PDFs to add'}
+          {dragging ? 'Drop to add' : 'Click or drag PDF or JSON files to add'}
         </div>
-        <div className="kb-dropzone-hint">PDF only · Max 50 MB per file · Multiple files supported</div>
+        <div className="kb-dropzone-hint">PDF or JSON · Max 1GB per file · Multiple files supported</div>
       </div>
 
       {/* Staged file queue */}

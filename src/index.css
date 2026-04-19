@@ -2182,12 +2182,12 @@ input:-webkit-autofill:focus {
 
 .ch-input-box {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 10px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 10px 10px 10px 16px;
+  padding: 8px 10px 8px 14px;
   transition: border-color 0.15s;
 }
 
@@ -2205,11 +2205,15 @@ input:-webkit-autofill:focus {
   font-size: 13.5px;
   color: #1e293b;
   line-height: 1.55;
-  min-height: 22px;
+  min-height: 32px;
   max-height: 160px;
+  padding: 5.5px 0;
+  margin: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(0,0,0,0.08) transparent;
+  display: block;
+  box-sizing: border-box;
 }
 
 .ch-textarea::placeholder {
@@ -2221,8 +2225,8 @@ input:-webkit-autofill:focus {
 }
 
 .ch-send-btn {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   background: #4B55EA;
   color: #fff;
   border: none;
@@ -2245,8 +2249,8 @@ input:-webkit-autofill:focus {
 }
 
 .ch-attach-btn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   background: transparent;
   border: none;
   color: #94a3b8;
@@ -2681,8 +2685,8 @@ input:-webkit-autofill:focus {
 
 /* ── Stop generating button ── */
 .ch-stop-btn {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   background: #ef4444;
   color: #fff;
   border: none;
