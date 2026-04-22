@@ -283,27 +283,22 @@ export type IngestStatus = 'pending' | 'ingesting' | 'ingested' | 'failed';
 export interface DocumentListItem {
   id: number;
   filename: string;
-  file_size: number;
   uploaded_by: string;
   uploaded_at: string;   // ISO string
   ingest_status: IngestStatus;
-  ingested_at: string | null;
 }
 
 export interface DocumentUploadResult {
   filename: string;
   success: boolean;
   id?: number;
-  file_size?: number;
   ingest_status?: IngestStatus;
-  uploaded_at?: string;
   error?: string;
 }
 
 export interface IngestResult {
   id: number;
   filename: string;
-  success: boolean;
   ingest_status?: IngestStatus;
   error?: string;
 }

@@ -3,12 +3,6 @@ import { FileText, CheckCircle, AlertCircle, Clock, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiListDocuments, type DocumentListItem, type IngestStatus } from '../../lib/api';
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-MY', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -18,7 +12,7 @@ function formatDate(iso: string): string {
 const StatusBadge: React.FC<{ status: IngestStatus }> = ({ status }) => {
   const map: Record<IngestStatus, { label: string; cls: string; icon: React.ReactNode }> = {
     pending:   { label: 'Pending',   cls: 'kb-badge-pending',   icon: <Clock size={11} /> },
-    ingesting: { label: 'Ingesting', cls: 'kb-badge-pending',   icon: <Clock size={11} /> },
+    ingesting: { label: 'Ingesting', cls: 'kb-badge-ingesting', icon: <Clock size={11} /> },
     ingested:  { label: 'Ingested',  cls: 'kb-badge-ingested',  icon: <CheckCircle size={11} /> },
     failed:    { label: 'Failed',    cls: 'kb-badge-failed',    icon: <AlertCircle size={11} /> },
   };
@@ -94,7 +88,6 @@ const Documents: React.FC = () => {
               <thead>
                 <tr>
                   <th>Document</th>
-                  <th>Size</th>
                   <th>Uploaded</th>
                   <th>Status</th>
                 </tr>
@@ -109,9 +102,6 @@ const Documents: React.FC = () => {
                         </div>
                         <span className="kb-filename">{doc.filename}</span>
                       </div>
-                    </td>
-                    <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
-                      {formatBytes(doc.file_size)}
                     </td>
                     <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
                       {formatDate(doc.uploaded_at)}
@@ -137,10 +127,6 @@ const Documents: React.FC = () => {
                   <StatusBadge status={doc.ingest_status} />
                 </div>
                 <div className="adm-mobile-card-details">
-                  <div className="adm-mobile-card-detail">
-                    <span className="adm-mobile-card-label">Size</span>
-                    <span className="adm-mobile-card-value">{formatBytes(doc.file_size)}</span>
-                  </div>
                   <div className="adm-mobile-card-detail">
                     <span className="adm-mobile-card-label">Uploaded</span>
                     <span className="adm-mobile-card-value">{formatDate(doc.uploaded_at)}</span>

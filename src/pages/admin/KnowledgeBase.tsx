@@ -82,6 +82,24 @@ const KnowledgeBase: React.FC = () => {
     return () => clearInterval(id);
   }, [docs, load]);
 
+  const handleReIngest = async (id: number, filename: string) => {
+    setReIngestingId(id);
+    try {
+      const results = await apiIngestDocuments(user!.accessToken, [id]);
+      const result = results[0];
+      if (!result?.error) {
+        toast(`"${filename}" re-ingestion started.`, 'success');
+      } else {
+        toast(`"${filename}": ${result.error}`, 'error');
+      }
+      await load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Re-ingestion failed', 'error');
+    } finally {
+      setReIngestingId(null);
+    }
+  };
+
   const stageFiles = (incoming: File[]) => {
     const accepted = incoming.filter(f => {
       const name = f.name.toLowerCase();
@@ -126,25 +144,7 @@ const KnowledgeBase: React.FC = () => {
     }
   };
 
-  const handleReIngest = async (id: number, filename: string) => {
-    setReIngestingId(id);
-    try {
-      const results = await apiIngestDocuments(user!.accessToken, [id]);
-      const result = results[0];
-      if (result?.success) {
-        toast(`"${filename}" re-ingestion started.`, 'success');
-      } else {
-        toast(`"${filename}": ${result?.error ?? 'Re-ingestion failed'}`, 'error');
-      }
-      await load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Re-ingestion failed', 'error');
-    } finally {
-      setReIngestingId(null);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
+const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
     stageFiles(Array.from(e.dataTransfer.files));
@@ -316,7 +316,6 @@ const KnowledgeBase: React.FC = () => {
               <thead>
                 <tr>
                   <th>Document</th>
-                  <th>Size</th>
                   <th>Uploaded By</th>
                   <th>Uploaded</th>
                   <th>Status</th>
@@ -333,9 +332,6 @@ const KnowledgeBase: React.FC = () => {
                         </div>
                         <span className="kb-filename">{doc.filename}</span>
                       </div>
-                    </td>
-                    <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
-                      {formatBytes(doc.file_size)}
                     </td>
                     <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
                       {doc.uploaded_by}
@@ -413,10 +409,6 @@ const KnowledgeBase: React.FC = () => {
                   </div>
                 </div>
                 <div className="adm-mobile-card-details">
-                  <div className="adm-mobile-card-detail">
-                    <span className="adm-mobile-card-label">Size</span>
-                    <span className="adm-mobile-card-value">{formatBytes(doc.file_size)}</span>
-                  </div>
                   <div className="adm-mobile-card-detail">
                     <span className="adm-mobile-card-label">By</span>
                     <span className="adm-mobile-card-value">{doc.uploaded_by}</span>
