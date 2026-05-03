@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '../../context/AuthContext';
-import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip, Menu, Square, RefreshCw, Pencil, Check } from 'lucide-react';
+import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip, Menu, Square, RefreshCw, Pencil, Check, FileText, Loader2 } from 'lucide-react';
 import {
   apiListConversations,
   apiCreateConversation,
@@ -54,10 +54,13 @@ const UserDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadedCaseId, setUploadedCaseId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const userScrolledRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -84,8 +87,17 @@ const UserDashboard: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!userScrolledRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [activeSession?.messages]);
+
+  const handleChatScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    userScrolledRef.current = !atBottom;
+  };
 
   // Auto-resize textarea
   const resizeTextarea = () => {
@@ -207,6 +219,7 @@ const UserDashboard: React.FC = () => {
 
   const selectConversation = useCallback(async (id: number) => {
     if (wsConvIdRef.current && wsConvIdRef.current !== id) closeWs();
+    userScrolledRef.current = false;
     setActiveId(id);
     setSessions(prev => {
       const s = prev.find(x => x.id === id);
@@ -275,11 +288,24 @@ const UserDashboard: React.FC = () => {
     navigate('/', { replace: true });
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setAttachedFile(file);
     e.target.value = '';
+    setAttachedFile(file);
+    setUploadError('');
+    setUploadedCaseId(null);
+    setUploading(true);
+    const caseId = crypto.randomUUID();
+    try {
+      await apiUploadCaseDocument(user!.accessToken, caseId, file);
+      setUploadedCaseId(caseId);
+    } catch (err) {
+      setAttachedFile(null);
+      setUploadError(err instanceof Error ? err.message : 'Failed to upload file. Please try again.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   // ── Stop generating ──
@@ -292,6 +318,7 @@ const UserDashboard: React.FC = () => {
   // ── Regenerate last response ──
   const regenerate = async () => {
     if (busy || !activeId || !activeSession) return;
+    userScrolledRef.current = false;
     const msgs = activeSession.messages;
     if (msgs.length < 2) return;
 
@@ -332,12 +359,15 @@ const UserDashboard: React.FC = () => {
   };
 
   const send = async (question: string) => {
-    if (!question.trim() || busy) return;
+    if (!question.trim() || busy || uploading) return;
     const currentFile = attachedFile;
+    const currentCaseId = uploadedCaseId;
     setUploadError('');
+    userScrolledRef.current = false;
     setBusy(true);
     setInput('');
     setAttachedFile(null);
+    setUploadedCaseId(null);
     setTimeout(() => {
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
     }, 0);
@@ -346,18 +376,14 @@ const UserDashboard: React.FC = () => {
     if (!sessionId) {
       const title = question.slice(0, 50) + (question.length > 50 ? '...' : '');
       try {
-        if (currentFile) {
-          setUploading(true);
-          const caseId = crypto.randomUUID();
-          await apiUploadCaseDocument(user!.accessToken, caseId, currentFile);
-          setUploading(false);
+        if (currentFile && currentCaseId) {
           const conv = await apiCreateCaseConversation(
             user!.accessToken,
-            caseId,
+            currentCaseId,
             `[${currentFile.name}] ${title}`,
           );
           setSessions(prev => [{
-            id: conv.id, case_id: caseId, title: conv.title, messages: [], loaded: true,
+            id: conv.id, case_id: currentCaseId, title: conv.title, messages: [], loaded: true,
           }, ...prev]);
           setActiveId(conv.id);
           sessionId = conv.id;
@@ -370,9 +396,8 @@ const UserDashboard: React.FC = () => {
           sessionId = conv.id;
         }
       } catch (err) {
-        setUploading(false);
         setBusy(false);
-        setUploadError(err instanceof Error ? err.message : 'Failed to upload file. Please try again.');
+        setUploadError(err instanceof Error ? err.message : 'Failed to create conversation. Please try again.');
         return;
       }
     }
@@ -578,7 +603,7 @@ const UserDashboard: React.FC = () => {
 
         {/* Messages */}
         {activeSession && activeSession.messages.length > 0 && (
-          <div className="ch-messages" role="log" aria-label="Conversation" aria-live="polite">
+          <div ref={scrollContainerRef} className="ch-messages" role="log" aria-label="Conversation" aria-live="polite" onScroll={handleChatScroll}>
             {activeSession.messages.map(msg => (
               <div key={msg.id} className={`ch-msg-row ch-msg-${msg.role}`}>
                 {msg.role === 'assistant' && (
@@ -645,22 +670,28 @@ const UserDashboard: React.FC = () => {
               </button>
             </div>
           )}
-          {uploading && (
-            <div className="ch-file-chip">
-              <span className="ch-file-chip-name">Uploading...</span>
-            </div>
-          )}
-          {!uploading && attachedFile && (
-            <div className="ch-file-chip">
-              <Paperclip size={11} />
-              <span className="ch-file-chip-name">{attachedFile.name}</span>
-              <button
-                className="ch-file-chip-remove"
-                onClick={() => setAttachedFile(null)}
-                aria-label="Remove attachment"
-              >
-                <X size={11} />
-              </button>
+          {attachedFile && (
+            <div className={`ch-file-card${uploading ? ' ch-file-card--uploading' : ''}`}>
+              <div className="ch-file-card-icon">
+                <FileText size={18} />
+              </div>
+              <div className="ch-file-card-info">
+                <span className="ch-file-card-name">{attachedFile.name}</span>
+                <span className="ch-file-card-meta">
+                  {uploading ? 'Uploading…' : (attachedFile.name.split('.').pop()?.toUpperCase() ?? 'FILE')}
+                </span>
+              </div>
+              {uploading ? (
+                <Loader2 size={14} className="ch-file-card-spinner" />
+              ) : (
+                <button
+                  className="ch-file-card-remove"
+                  onClick={() => { setAttachedFile(null); setUploadedCaseId(null); }}
+                  aria-label="Remove attachment"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
           )}
           <div className="ch-input-box">
@@ -674,7 +705,7 @@ const UserDashboard: React.FC = () => {
             <button
               className="ch-attach-btn"
               onClick={() => fileInputRef.current?.click()}
-              disabled={busy}
+              disabled={busy || uploading}
               aria-label="Attach file"
               title="Attach a case PDF to analyse"
             >
@@ -704,7 +735,7 @@ const UserDashboard: React.FC = () => {
               <button
                 className="ch-send-btn"
                 onClick={() => send(input)}
-                disabled={!input.trim()}
+                disabled={!input.trim() || uploading}
                 aria-label="Send message"
               >
                 <Send size={15} strokeWidth={2.5} aria-hidden="true" />
