@@ -37,6 +37,12 @@ function shortSource(s: string) {
   return s.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
 }
 
+function parseFileFromContent(content: string): { text: string; fileName: string | null } {
+  const match = content.match(/^([\s\S]*?)\s*\[([^\]]+)\]$/);
+  if (match) return { text: match[1], fileName: match[2] };
+  return { text: content, fileName: null };
+}
+
 const SUGGESTIONS = [
   'What Malaysian laws apply to money laundering?',
   'Explain AMLA 2001 and its key provisions',
@@ -618,9 +624,27 @@ const UserDashboard: React.FC = () => {
                         {msg.content}
                       </ReactMarkdown>
                     </div>
-                  ) : (
-                    <span>{msg.content}</span>
-                  )}
+                  ) : (() => {
+                    const { text, fileName } = parseFileFromContent(msg.content);
+                    return (
+                      <>
+                        {fileName && (
+                          <div className="ch-msg-file-chip">
+                            <div className="ch-msg-file-chip-icon">
+                              <FileText size={15} />
+                            </div>
+                            <div className="ch-msg-file-chip-info">
+                              <span className="ch-msg-file-chip-name">{fileName}</span>
+                              <span className="ch-msg-file-chip-type">
+                                {fileName.split('.').pop()?.toUpperCase() ?? 'FILE'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {text && <span>{text}</span>}
+                      </>
+                    );
+                  })()}
                   {msg.streaming && !msg.content && (
                     <span className="ch-typing-dots" aria-label="Generating response">
                       <span /><span /><span />
