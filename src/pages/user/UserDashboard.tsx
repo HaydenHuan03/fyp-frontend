@@ -7,8 +7,7 @@ import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip, Menu, Square, R
 import {
   apiListConversations,
   apiCreateConversation,
-  apiCreateCaseConversation,
-  apiUploadCaseDocument,
+  apiUploadChatAttachment,
   apiDeleteConversation,
   apiRenameConversation,
   apiGetConversationMessages,
@@ -60,7 +59,6 @@ const UserDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadedCaseId, setUploadedCaseId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -294,24 +292,23 @@ const UserDashboard: React.FC = () => {
     navigate('/', { replace: true });
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    setAttachedFile(file);
     setUploadError('');
-    setUploadedCaseId(null);
-    setUploading(true);
-    const caseId = crypto.randomUUID();
-    try {
-      await apiUploadCaseDocument(user!.accessToken, caseId, file);
-      setUploadedCaseId(caseId);
-    } catch (err) {
-      setAttachedFile(null);
-      setUploadError(err instanceof Error ? err.message : 'Failed to upload file. Please try again.');
-    } finally {
-      setUploading(false);
+
+    const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase();
+    const allowed = ['.pdf', '.txt', '.csv', '.md'];
+    if (!allowed.includes(ext)) {
+      setUploadError(`Unsupported file type. Allowed: ${allowed.join(', ')}`);
+      return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('File exceeds 10 MB limit.');
+      return;
+    }
+    setAttachedFile(file);
   };
 
   // ── Stop generating ──
@@ -367,13 +364,11 @@ const UserDashboard: React.FC = () => {
   const send = async (question: string) => {
     if (!question.trim() || busy || uploading) return;
     const currentFile = attachedFile;
-    const currentCaseId = uploadedCaseId;
     setUploadError('');
     userScrolledRef.current = false;
     setBusy(true);
     setInput('');
     setAttachedFile(null);
-    setUploadedCaseId(null);
     setTimeout(() => {
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
     }, 0);
@@ -382,30 +377,32 @@ const UserDashboard: React.FC = () => {
     if (!sessionId) {
       const title = question.slice(0, 50) + (question.length > 50 ? '...' : '');
       try {
-        if (currentFile && currentCaseId) {
-          const conv = await apiCreateCaseConversation(
-            user!.accessToken,
-            currentCaseId,
-            `[${currentFile.name}] ${title}`,
-          );
-          setSessions(prev => [{
-            id: conv.id, case_id: currentCaseId, title: conv.title, messages: [], loaded: true,
-          }, ...prev]);
-          setActiveId(conv.id);
-          sessionId = conv.id;
-        } else {
-          const conv = await apiCreateConversation(user!.accessToken, title);
-          setSessions(prev => [{
-            id: conv.id, case_id: null, title: conv.title, messages: [], loaded: true,
-          }, ...prev]);
-          setActiveId(conv.id);
-          sessionId = conv.id;
-        }
+        const conv = await apiCreateConversation(user!.accessToken, title);
+        setSessions(prev => [{
+          id: conv.id, case_id: null, title: conv.title, messages: [], loaded: true,
+        }, ...prev]);
+        setActiveId(conv.id);
+        sessionId = conv.id;
       } catch (err) {
         setBusy(false);
         setUploadError(err instanceof Error ? err.message : 'Failed to create conversation. Please try again.');
         return;
       }
+    }
+
+    let fileContext: { filename: string; text: string } | null = null;
+    if (currentFile) {
+      setUploading(true);
+      try {
+        const result = await apiUploadChatAttachment(user!.accessToken, sessionId!, currentFile);
+        fileContext = { filename: result.filename, text: result.text };
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : 'Failed to process attachment. Please try again.');
+        setBusy(false);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
     }
 
     const userMsgId = uid();
@@ -428,8 +425,10 @@ const UserDashboard: React.FC = () => {
     sessionIdForWsRef.current = sessionId;
 
     try {
-      const ws = await connectWs(sessionId);
-      ws.send(JSON.stringify({ question }));
+      const ws = await connectWs(sessionId!);
+      const payload: Record<string, unknown> = { question };
+      if (fileContext) payload.file_context = fileContext;
+      ws.send(JSON.stringify(payload));
     } catch (err) {
       const isAuthError = err instanceof Error && err.message === 'Authentication failed';
       setSessions(prev => prev.map(s => s.id !== sessionId ? s : {
@@ -702,7 +701,7 @@ const UserDashboard: React.FC = () => {
               <div className="ch-file-card-info">
                 <span className="ch-file-card-name">{attachedFile.name}</span>
                 <span className="ch-file-card-meta">
-                  {uploading ? 'Uploading…' : (attachedFile.name.split('.').pop()?.toUpperCase() ?? 'FILE')}
+                  {uploading ? 'Processing…' : (attachedFile.name.split('.').pop()?.toUpperCase() ?? 'FILE')}
                 </span>
               </div>
               {uploading ? (
@@ -710,7 +709,7 @@ const UserDashboard: React.FC = () => {
               ) : (
                 <button
                   className="ch-file-card-remove"
-                  onClick={() => { setAttachedFile(null); setUploadedCaseId(null); }}
+                  onClick={() => setAttachedFile(null)}
                   aria-label="Remove attachment"
                 >
                   <X size={13} />
@@ -722,7 +721,7 @@ const UserDashboard: React.FC = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf"
+              accept=".pdf,.txt,.csv,.md"
               style={{ display: 'none' }}
               onChange={handleFileChange}
             />

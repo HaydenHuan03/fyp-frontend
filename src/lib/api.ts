@@ -473,3 +473,26 @@ export async function apiCreateCaseConversation(
   });
   return handleResponse<Conversation>(res, 'Failed to create case conversation');
 }
+
+export interface FileUploadResult {
+  id: string;
+  filename: string;
+  text: string;
+  preview: string;
+  truncated: boolean;
+}
+
+/** Upload a file to a chat conversation and extract its text for prompt injection. */
+export async function apiUploadChatAttachment(
+  token: string,
+  conversationId: number,
+  file: File,
+): Promise<FileUploadResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await authFetch(`${BASE_URL}/chat/conversations/${conversationId}/upload`, token, {
+    method: 'POST',
+    body: form,
+  });
+  return handleResponse<FileUploadResult>(res, 'Failed to process attachment');
+}
