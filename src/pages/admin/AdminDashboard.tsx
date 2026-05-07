@@ -6,10 +6,11 @@ import AdminSidebar from '../../components/admin/AdminSidebar';
 import UserManagement from './UserManagement';
 import KnowledgeBase from './KnowledgeBase';
 import Documents from './Documents';
+import Alerts from './Alerts';
 
-type Section = 'users' | 'knowledge' | 'documents';
+type Section = 'users' | 'knowledge' | 'documents' | 'alerts';
 
-const SECTIONS: Section[] = ['users', 'knowledge', 'documents'];
+const SECTIONS: Section[] = ['users', 'knowledge', 'documents', 'alerts'];
 const SESSION_KEY = 'adm_section';
 
 function readSection(): Section {
@@ -21,6 +22,7 @@ const sectionLabel: Record<Section, string> = {
   users:     'Manage Users',
   knowledge: 'Knowledge Base',
   documents: 'Documents',
+  alerts:    'Alerts',
 };
 
 
@@ -67,6 +69,7 @@ const AdminDashboard: React.FC = () => {
           {section === 'users'     && <UserManagement />}
           {section === 'knowledge' && <KnowledgeBase />}
           {section === 'documents' && <Documents />}
+          {section === 'alerts'    && <Alerts />}
         </main>
       </div>
     </div>

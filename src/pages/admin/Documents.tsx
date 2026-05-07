@@ -89,6 +89,7 @@ const Documents: React.FC = () => {
                 <tr>
                   <th>Document</th>
                   <th>Uploaded</th>
+                  <th>Chunks</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -105,6 +106,9 @@ const Documents: React.FC = () => {
                     </td>
                     <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
                       {formatDate(doc.uploaded_at)}
+                    </td>
+                    <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
+                      {doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}
                     </td>
                     <td><StatusBadge status={doc.ingest_status} /></td>
                   </tr>
@@ -130,6 +134,10 @@ const Documents: React.FC = () => {
                   <div className="adm-mobile-card-detail">
                     <span className="adm-mobile-card-label">Uploaded</span>
                     <span className="adm-mobile-card-value">{formatDate(doc.uploaded_at)}</span>
+                  </div>
+                  <div className="adm-mobile-card-detail">
+                    <span className="adm-mobile-card-label">Chunks</span>
+                    <span className="adm-mobile-card-value">{doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}</span>
                   </div>
                 </div>
               </div>

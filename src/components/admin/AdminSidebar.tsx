@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Users, BookOpen, FileText, Scale } from 'lucide-react';
+import { Users, BookOpen, FileText, Scale, ShieldAlert } from 'lucide-react';
 
-type Section = 'users' | 'knowledge' | 'documents';
+type Section = 'users' | 'knowledge' | 'documents' | 'alerts';
 
 interface Props {
   activeSection: Section;
@@ -76,6 +76,13 @@ const AdminSidebar: React.FC<Props> = ({ activeSection, onSectionChange, mobileO
         >
           <FileText size={16} />
           Documents
+        </button>
+        <button
+          className={`adm-nav-item${activeSection === 'alerts' ? ' active' : ''}`}
+          onClick={() => onSectionChange('alerts')}
+        >
+          <ShieldAlert size={16} />
+          Alerts
         </button>
       </nav>
 

@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader, X, RefreshCw } from 'lucide-react';
+import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader, X, RefreshCw, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   apiListDocuments,
   apiUploadDocuments,
   apiIngestDocuments,
   apiDeleteDocument,
+  apiListDocumentChunks,
   type DocumentListItem,
   type IngestStatus,
+  type ChunkPreviewItem,
 } from '../../lib/api';
 
 interface Toast { id: number; msg: string; type: 'success' | 'error'; }
@@ -43,6 +45,16 @@ const StatusCell: React.FC<{ status: IngestStatus }> = ({ status }) => {
   );
 };
 
+interface ChunksModal {
+  doc: DocumentListItem;
+  chunks: ChunkPreviewItem[];
+  page: number;
+  loading: boolean;
+  total: number;
+}
+
+const PAGE_SIZE = 10;
+
 const KnowledgeBase: React.FC = () => {
   const { user } = useAuth();
   const [docs, setDocs] = useState<DocumentListItem[]>([]);
@@ -53,6 +65,7 @@ const KnowledgeBase: React.FC = () => {
   const [reIngestingId, setReIngestingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [chunksModal, setChunksModal] = useState<ChunksModal | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toast = useCallback((msg: string, type: 'success' | 'error') => {
@@ -153,6 +166,18 @@ const handleDrop = (e: React.DragEvent) => {
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     stageFiles(Array.from(e.target.files ?? []));
     e.target.value = '';
+  };
+
+  const handleViewChunks = async (doc: DocumentListItem, page = 0) => {
+    if (chunksModal && chunksModal.doc.id === doc.id && chunksModal.page === page) return;
+    setChunksModal(prev => prev ? { ...prev, loading: true } : { doc, chunks: [], page, loading: true, total: doc.chunk_count });
+    try {
+      const chunks = await apiListDocumentChunks(user!.accessToken, doc.id, PAGE_SIZE, page * PAGE_SIZE);
+      setChunksModal({ doc, chunks, page, loading: false, total: doc.chunk_count });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to load chunks', 'error');
+      setChunksModal(null);
+    }
   };
 
   const handleDelete = async (id: number, filename: string) => {
@@ -318,6 +343,7 @@ const handleDrop = (e: React.DragEvent) => {
                   <th>Document</th>
                   <th>Uploaded By</th>
                   <th>Uploaded</th>
+                  <th>Chunks</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -339,9 +365,22 @@ const handleDrop = (e: React.DragEvent) => {
                     <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
                       {formatDate(doc.uploaded_at)}
                     </td>
+                    <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
+                      {doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}
+                    </td>
                     <td><StatusCell status={doc.ingest_status} /></td>
                     <td>
                       <div className="adm-row-actions">
+                        {doc.ingest_status === 'ingested' && doc.chunk_count > 0 && (
+                          <button
+                            className="adm-row-btn"
+                            title="Preview chunks"
+                            onClick={() => handleViewChunks(doc)}
+                            aria-label={`Preview chunks for ${doc.filename}`}
+                          >
+                            <Eye size={14} />
+                          </button>
+                        )}
                         {doc.ingest_status === 'failed' && (
                           <button
                             className="adm-row-btn"
@@ -384,6 +423,16 @@ const handleDrop = (e: React.DragEvent) => {
                     <span className="kb-filename">{doc.filename}</span>
                   </div>
                   <div className="adm-row-actions">
+                    {doc.ingest_status === 'ingested' && doc.chunk_count > 0 && (
+                      <button
+                        className="adm-row-btn"
+                        title="Preview chunks"
+                        onClick={() => handleViewChunks(doc)}
+                        aria-label={`Preview chunks for ${doc.filename}`}
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )}
                     {doc.ingest_status === 'failed' && (
                       <button
                         className="adm-row-btn"
@@ -417,6 +466,10 @@ const handleDrop = (e: React.DragEvent) => {
                     <span className="adm-mobile-card-label">Date</span>
                     <span className="adm-mobile-card-value">{formatDate(doc.uploaded_at)}</span>
                   </div>
+                  <div className="adm-mobile-card-detail">
+                    <span className="adm-mobile-card-label">Chunks</span>
+                    <span className="adm-mobile-card-value">{doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}</span>
+                  </div>
                 </div>
                 <div className="adm-mobile-card-footer">
                   <StatusCell status={doc.ingest_status} />
@@ -427,6 +480,63 @@ const handleDrop = (e: React.DragEvent) => {
           </>
         )}
       </div>
+
+      {/* Chunks viewer modal */}
+      {chunksModal && (
+        <div className="adm-modal-overlay" onClick={() => setChunksModal(null)}>
+          <div className="adm-modal" style={{ maxWidth: '720px', width: '100%' }} onClick={e => e.stopPropagation()}>
+            <div className="adm-modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>Chunk Preview — {chunksModal.doc.filename}</span>
+              <button className="kb-staged-remove" onClick={() => setChunksModal(null)} aria-label="Close"><X size={16} /></button>
+            </div>
+            <div className="adm-modal-sub">
+              {chunksModal.total.toLocaleString()} total chunk{chunksModal.total !== 1 ? 's' : ''} · page {chunksModal.page + 1} of {Math.ceil(chunksModal.total / PAGE_SIZE)}
+            </div>
+            {chunksModal.loading ? (
+              <div className="kb-empty-state"><Loader size={20} className="kb-spin" /></div>
+            ) : chunksModal.chunks.length === 0 ? (
+              <div className="kb-empty-state">No chunks on this page.</div>
+            ) : (
+              <div style={{ maxHeight: '420px', overflowY: 'auto', marginTop: '12px' }}>
+                {chunksModal.chunks.map((chunk, i) => (
+                  <div key={chunk.id} style={{ padding: '12px', borderBottom: '1px solid var(--adm-border)', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'baseline' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--adm-accent)', minWidth: '28px' }}>#{chunksModal.page * PAGE_SIZE + i + 1}</span>
+                      <span style={{ color: 'var(--adm-text-sub)', fontSize: '11px', fontFamily: 'monospace' }}>{chunk.id}</span>
+                    </div>
+                    <div style={{ color: 'var(--adm-text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{chunk.text}</div>
+                    {Object.keys(chunk.metadata).length > 0 && (
+                      <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {Object.entries(chunk.metadata).map(([k, v]) => (
+                          <span key={k} style={{ fontSize: '11px', background: 'var(--adm-accent-tint)', color: 'var(--adm-accent)', borderRadius: '4px', padding: '2px 6px' }}>
+                            {k}: {String(v)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="adm-modal-footer">
+              <button
+                className="adm-btn-secondary"
+                disabled={chunksModal.page === 0 || chunksModal.loading}
+                onClick={() => handleViewChunks(chunksModal.doc, chunksModal.page - 1)}
+              >
+                <ChevronLeft size={14} /> Prev
+              </button>
+              <button
+                className="adm-btn-secondary"
+                disabled={chunksModal.loading || (chunksModal.page + 1) * PAGE_SIZE >= chunksModal.total}
+                onClick={() => handleViewChunks(chunksModal.doc, chunksModal.page + 1)}
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toasts */}
       {toasts.map(t => (

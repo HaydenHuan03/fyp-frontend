@@ -286,6 +286,7 @@ export interface DocumentListItem {
   uploaded_by: string;
   uploaded_at: string;   // ISO string
   ingest_status: IngestStatus;
+  chunk_count: number;
 }
 
 export interface DocumentUploadResult {
@@ -300,7 +301,14 @@ export interface IngestResult {
   id: number;
   filename: string;
   ingest_status?: IngestStatus;
+  chunk_count?: number;
   error?: string;
+}
+
+export interface ChunkPreviewItem {
+  id: string;
+  text: string;
+  metadata: Record<string, unknown>;
 }
 
 export async function apiListDocuments(token: string): Promise<DocumentListItem[]> {
@@ -330,6 +338,20 @@ export async function apiIngestDocuments(token: string, ids: number[]): Promise<
     body: JSON.stringify({ document_ids: ids }),
   });
   return handleResponse<IngestResult[]>(res, 'Failed to ingest documents');
+}
+
+export async function apiListDocumentChunks(
+  token: string,
+  documentId: number,
+  limit = 50,
+  offset = 0,
+): Promise<ChunkPreviewItem[]> {
+  const res = await authFetch(
+    `${BASE_URL}/rag/documents/${documentId}/chunks?limit=${limit}&offset=${offset}`,
+    token,
+    { headers: authHeaders(token) },
+  );
+  return handleResponse<ChunkPreviewItem[]>(res, 'Failed to fetch chunks');
 }
 
 export async function apiDeleteDocument(token: string, id: number): Promise<void> {
@@ -480,6 +502,37 @@ export interface FileUploadResult {
   text: string;
   preview: string;
   truncated: boolean;
+}
+
+// ── Alerts ───────────────────────────────────────────────────────────────────
+
+export interface AlertItem {
+  id: number;
+  user_id: string;
+  conversation_id: number | null;
+  chat_message_id: number | null;
+  query: string;
+  created_at: string;
+}
+
+export async function apiListAlerts(token: string): Promise<AlertItem[]> {
+  const res = await authFetch(`${BASE_URL}/alerts/`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<AlertItem[]>(res, 'Failed to fetch alerts');
+}
+
+export async function apiDeleteAlert(token: string, id: number): Promise<void> {
+  const res = await authFetch(`${BASE_URL}/alerts/${id}`, token, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (res.status === 401) throw new Error('Session expired. Please log in again.');
+  if (res.status === 204) return;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail ?? 'Failed to delete alert');
+  }
 }
 
 /** Upload a file to a chat conversation and extract its text for prompt injection. */
