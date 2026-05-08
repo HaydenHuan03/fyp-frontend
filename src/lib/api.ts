@@ -160,6 +160,15 @@ async function handleResponse<T>(res: Response, fallbackMessage: string): Promis
   return res.json() as Promise<T>;
 }
 
+async function handleDeleteResponse(res: Response, fallbackMessage: string): Promise<void> {
+  if (res.status === 401) throw new Error('Session expired. Please log in again.');
+  if (res.status === 204) return;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail ?? fallbackMessage);
+  }
+}
+
 export async function apiGetUsers(token: string): Promise<User[]> {
   const res = await authFetch(`${BASE_URL}/users/`, token, {
     headers: authHeaders(token),
@@ -197,13 +206,7 @@ export async function apiDeleteUser(token: string, id: string): Promise<void> {
     method: 'DELETE',
     headers: authHeaders(token),
   });
-  if (res.status === 401) {
-    throw new Error('Session expired. Please log in again.');
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? 'Failed to delete user');
-  }
+  return handleDeleteResponse(res, 'Failed to delete user');
 }
 
 // ── Chat ────────────────────────────────────────────────────────────────────
@@ -254,14 +257,7 @@ export async function apiDeleteConversation(token: string, id: number): Promise<
     method: 'DELETE',
     headers: authHeaders(token),
   });
-  if (res.status === 401) {
-    throw new Error('Session expired. Please log in again.');
-  }
-  if (res.status === 204) return;
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? 'Failed to delete conversation');
-  }
+  return handleDeleteResponse(res, 'Failed to delete conversation');
 }
 
 export async function apiGetConversationMessages(token: string, id: number): Promise<ChatMessage[]> {
@@ -359,14 +355,7 @@ export async function apiDeleteDocument(token: string, id: number): Promise<void
     method: 'DELETE',
     headers: authHeaders(token),
   });
-  if (res.status === 401) {
-    throw new Error('Session expired. Please log in again.');
-  }
-  if (res.status === 204) return;
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? 'Failed to delete document');
-  }
+  return handleDeleteResponse(res, 'Failed to delete document');
 }
 
 // ── Agent / Case Analysis ────────────────────────────────────────────────────
@@ -527,12 +516,7 @@ export async function apiDeleteAlert(token: string, id: number): Promise<void> {
     method: 'DELETE',
     headers: authHeaders(token),
   });
-  if (res.status === 401) throw new Error('Session expired. Please log in again.');
-  if (res.status === 204) return;
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? 'Failed to delete alert');
-  }
+  return handleDeleteResponse(res, 'Failed to delete alert');
 }
 
 /** Upload a file to a chat conversation and extract its text for prompt injection. */

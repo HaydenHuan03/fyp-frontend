@@ -11,9 +11,9 @@ import {
   type IngestStatus,
   type ChunkPreviewItem,
 } from '../../lib/api';
-
-interface Toast { id: number; msg: string; type: 'success' | 'error'; }
-let _tid = 0;
+import { useToast } from '../../hooks/useToast';
+import { formatDate } from '../../lib/utils';
+import { IngestStatusBadge } from '../../components/admin/IngestStatusBadge';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -21,29 +21,14 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-MY', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  });
-}
-
-const StatusCell: React.FC<{ status: IngestStatus }> = ({ status }) => {
-  const map: Record<IngestStatus, { label: string; cls: string; icon: React.ReactNode }> = {
-    pending:   { label: 'Pending',    cls: 'kb-badge-pending',   icon: <Clock size={11} /> },
-    ingesting: { label: 'Ingesting…', cls: 'kb-badge-ingesting', icon: <Loader size={11} className="kb-spin" /> },
-    ingested:  { label: 'Ingested',   cls: 'kb-badge-ingested',  icon: <CheckCircle size={11} /> },
-    failed:    { label: 'Failed',     cls: 'kb-badge-failed',    icon: <AlertCircle size={11} /> },
-  };
-  const { label, cls, icon } = map[status];
-  return (
-    <div className="kb-status-cell">
-      <span className={`adm-badge ${cls}`}>{icon}{label}</span>
-      <div className="kb-progress-track">
-        <div className={`kb-progress-fill kb-progress-fill--${status}`} />
-      </div>
+const StatusCell: React.FC<{ status: IngestStatus }> = ({ status }) => (
+  <div className="kb-status-cell">
+    <IngestStatusBadge status={status} />
+    <div className="kb-progress-track">
+      <div className={`kb-progress-fill kb-progress-fill--${status}`} />
     </div>
-  );
-};
+  </div>
+);
 
 interface ChunksModal {
   doc: DocumentListItem;
@@ -64,15 +49,9 @@ const KnowledgeBase: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [reIngestingId, setReIngestingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
   const [chunksModal, setChunksModal] = useState<ChunksModal | null>(null);
+  const { toasts, toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const toast = useCallback((msg: string, type: 'success' | 'error') => {
-    const id = ++_tid;
-    setToasts(p => [...p, { id, msg, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000);
-  }, []);
 
   const load = useCallback(async () => {
     try {

@@ -2,29 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { ShieldAlert, Trash2, CheckCircle, AlertCircle, Loader, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiListAlerts, apiDeleteAlert, type AlertItem } from '../../lib/api';
-
-interface Toast { id: number; msg: string; type: 'success' | 'error'; }
-let _tid = 0;
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-MY', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
+import { useToast } from '../../hooks/useToast';
+import { formatDateTime } from '../../lib/utils';
 
 const Alerts: React.FC = () => {
   const { user } = useAuth();
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const toast = useCallback((msg: string, type: 'success' | 'error') => {
-    const id = ++_tid;
-    setToasts(p => [...p, { id, msg, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000);
-  }, []);
+  const { toasts, toast } = useToast();
 
   const load = useCallback(async () => {
     try {

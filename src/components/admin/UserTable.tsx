@@ -5,7 +5,6 @@ interface Props {
   users: User[];
   loading: boolean;
   onEdit: (user: User) => void;
-  onToggleSuspend: (user: User) => void;
   onDelete: (user: User) => void;
 }
 

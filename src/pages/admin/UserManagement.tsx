@@ -193,9 +193,6 @@ const UserManagement: React.FC = () => {
           users={filtered}
           loading={loading}
           onEdit={user => setModal({ type: 'edit', user })}
-          onToggleSuspend={user =>
-            setModal({ type: user.is_active ? 'suspend' : 'activate', user })
-          }
           onDelete={user => setModal({ type: 'delete', user })}
         />
       </div>
