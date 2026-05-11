@@ -1,5 +1,5 @@
 import type { User } from '../../lib/api';
-import { Edit2, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, KeyRound } from 'lucide-react';
 
 interface Props {
   users: User[];
@@ -8,7 +8,7 @@ interface Props {
   onDelete: (user: User) => void;
 }
 
-function getInitials(fullName: string, email: string): string {
+function initials(fullName: string, email: string): string {
   const name = fullName.trim();
   if (name) {
     const parts = name.split(/\s+/);
@@ -21,155 +21,92 @@ function getInitials(fullName: string, email: string): string {
   return local.slice(0, 2).toUpperCase();
 }
 
-const SkeletonRows: React.FC = () => (
-  <>
-    {[1, 2, 3, 4].map(i => (
-      <tr key={i}>
-        <td>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div className="adm-skeleton" style={{ width: '30px', height: '30px', borderRadius: '50%', flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div className="adm-skeleton" style={{ width: '120px', marginBottom: '5px' }} />
-              <div className="adm-skeleton" style={{ width: '160px', height: '11px' }} />
-            </div>
-          </div>
-        </td>
-        <td><div className="adm-skeleton" style={{ width: '55px' }} /></td>
-        <td><div className="adm-skeleton" style={{ width: '65px' }} /></td>
-        <td>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <div className="adm-skeleton" style={{ width: '30px', height: '30px', borderRadius: '6px' }} />
-            <div className="adm-skeleton" style={{ width: '30px', height: '30px', borderRadius: '6px' }} />
-          </div>
-        </td>
-      </tr>
-    ))}
-  </>
+const SkeletonRow: React.FC = () => (
+  <tr>
+    <td>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="adm-skeleton" style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }} />
+        <div>
+          <div className="adm-skeleton" style={{ width: 110, marginBottom: 4 }} />
+          <div className="adm-skeleton" style={{ width: 150, height: 11 }} />
+        </div>
+      </div>
+    </td>
+    <td><div className="adm-skeleton" style={{ width: 52 }} /></td>
+    <td><div className="adm-skeleton" style={{ width: 62 }} /></td>
+    <td><div className="adm-skeleton" style={{ width: 80 }} /></td>
+    <td><div className="adm-skeleton" style={{ width: 80 }} /></td>
+    <td><div className="adm-skeleton" style={{ width: 60 }} /></td>
+  </tr>
 );
 
-const UserTable: React.FC<Props> = ({
-  users, loading, onEdit, onDelete,
-}) => {
+const UserTable: React.FC<Props> = ({ users, loading, onEdit, onDelete }) => {
   if (!loading && users.length === 0) {
     return (
-      <div className="adm-table-wrap">
-        <div className="adm-empty">No users found.</div>
+      <div className="empty">
+        <span className="t">No users found</span>
+        <span className="s">Try adjusting your search or filters.</span>
       </div>
     );
   }
 
   return (
-    <>
-      {/* Desktop table */}
-      <div className="adm-table-wrap adm-hide-mobile">
-        <table className="adm-table">
-          <thead>
-            <tr>
-              <th>User</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <SkeletonRows />
-            ) : (
-              users.map(user => (
-                <tr key={user.id}>
+    <div className="table-wrap">
+      <table className="t">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Joined</th>
+            <th>Last seen</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading
+            ? [1, 2, 3, 4].map(i => <SkeletonRow key={i} />)
+            : users.map(u => (
+                <tr key={u.id}>
                   <td>
-                    <div className="adm-user-cell">
-                      <div className={`adm-row-avatar adm-row-avatar--${user.role}`}>
-                        {getInitials(user.full_name, user.email)}
-                      </div>
-                      <div>
-                        <div className="adm-row-name">{user.full_name || '—'}</div>
-                        <div className="adm-row-email">{user.email}</div>
+                    <div className="who">
+                      <div className="avatar">{initials(u.full_name, u.email)}</div>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="who__name">{u.full_name || '—'}</div>
+                        <div className="who__sub">{u.email}</div>
                       </div>
                     </div>
                   </td>
                   <td>
-                    <span className={`adm-badge adm-badge-${user.role}`}>
-                      {user.role === 'admin' ? 'Admin' : 'User'}
-                    </span>
+                    {u.role === 'admin'
+                      ? <span className="pill pill--accent">Admin</span>
+                      : <span className="pill">User</span>}
                   </td>
                   <td>
-                    <span className={`adm-badge adm-badge-${user.is_active ? 'active' : 'suspended'}`}>
-                      {user.is_active ? 'Active' : 'Suspended'}
-                    </span>
+                    {u.is_active
+                      ? <span className="pill pill--success pill--dot">Active</span>
+                      : <span className="pill pill--danger pill--dot">Suspended</span>}
                   </td>
+                  <td className="num muted">{new Date(u.created_at).toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                  <td className="num muted">—</td>
                   <td>
-                    <div className="adm-row-actions">
-                      <button
-                        className="adm-row-btn"
-                        onClick={() => onEdit(user)}
-                        title="Edit user"
-                      >
-                        <Edit2 size={14} />
+                    <div className="row-actions">
+                      <button className="row-btn" title="Edit user" onClick={() => onEdit(u)}>
+                        <Pencil size={13} />
                       </button>
-                      <button
-                        className="adm-row-btn adm-row-btn--danger"
-                        onClick={() => onDelete(user)}
-                        title="Delete user"
-                      >
-                        <Trash2 size={14} />
+                      <button className="row-btn" title="Reset password">
+                        <KeyRound size={13} />
+                      </button>
+                      <button className="row-btn row-btn--danger" title="Delete user" onClick={() => onDelete(u)}>
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile cards */}
-      <div className="adm-mobile-cards adm-show-mobile">
-        {loading ? (
-          [1, 2, 3].map(i => (
-            <div key={i} className="adm-mobile-card">
-              <div className="adm-mobile-card-header">
-                <div className="adm-skeleton" style={{ width: '30px', height: '30px', borderRadius: '50%' }} />
-                <div style={{ flex: 1 }}>
-                  <div className="adm-skeleton" style={{ width: '120px', marginBottom: '5px' }} />
-                  <div className="adm-skeleton" style={{ width: '160px', height: '11px' }} />
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          users.map(user => (
-            <div key={user.id} className="adm-mobile-card">
-              <div className="adm-mobile-card-header">
-                <div className={`adm-row-avatar adm-row-avatar--${user.role}`}>
-                  {getInitials(user.full_name, user.email)}
-                </div>
-                <div className="adm-mobile-card-info">
-                  <div className="adm-row-name">{user.full_name || '—'}</div>
-                  <div className="adm-row-email">{user.email}</div>
-                </div>
-                <div className="adm-row-actions">
-                  <button className="adm-row-btn" onClick={() => onEdit(user)} title="Edit user">
-                    <Edit2 size={14} />
-                  </button>
-                  <button className="adm-row-btn adm-row-btn--danger" onClick={() => onDelete(user)} title="Delete user">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-              <div className="adm-mobile-card-meta">
-                <span className={`adm-badge adm-badge-${user.role}`}>
-                  {user.role === 'admin' ? 'Admin' : 'User'}
-                </span>
-                <span className={`adm-badge adm-badge-${user.is_active ? 'active' : 'suspended'}`}>
-                  {user.is_active ? 'Active' : 'Suspended'}
-                </span>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </>
+              ))}
+        </tbody>
+      </table>
+    </div>
   );
 };
 

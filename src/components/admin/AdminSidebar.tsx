@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Users, BookOpen, FileText, Scale, ShieldAlert } from 'lucide-react';
+import {
+  LayoutDashboard, Users, BookOpen, FileText,
+  MessageSquare, FileCheck2, ShieldAlert,
+  Activity, History, LogOut,
+} from 'lucide-react';
 
-type Section = 'users' | 'knowledge' | 'documents' | 'alerts';
+type Section =
+  | 'overview' | 'users' | 'knowledge' | 'documents'
+  | 'conversations' | 'reports' | 'alerts'
+  | 'jobs' | 'audit';
 
 interface Props {
   activeSection: Section;
   onSectionChange: (s: Section) => void;
+  alertCount?: number;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
@@ -19,100 +27,112 @@ function getInitials(email: string): string {
   return local.slice(0, 2).toUpperCase();
 }
 
-const AdminSidebar: React.FC<Props> = ({ activeSection, onSectionChange, mobileOpen, onMobileClose }) => {
+const GROUPS = [
+  {
+    label: 'Workspace',
+    items: [
+      { id: 'overview'  as Section, label: 'Overview',       Icon: LayoutDashboard },
+      { id: 'users'     as Section, label: 'Users',          Icon: Users },
+      { id: 'knowledge' as Section, label: 'Knowledge base', Icon: BookOpen },
+      { id: 'documents' as Section, label: 'Documents',      Icon: FileText },
+    ],
+  },
+  {
+    label: 'Activity',
+    items: [
+      { id: 'conversations' as Section, label: 'Conversations', Icon: MessageSquare },
+      { id: 'reports'       as Section, label: 'Case reports',  Icon: FileCheck2 },
+      { id: 'alerts'        as Section, label: 'Alerts',        Icon: ShieldAlert, badge: true },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { id: 'jobs'  as Section, label: 'Background jobs', Icon: Activity },
+      { id: 'audit' as Section, label: 'Audit log',       Icon: History },
+    ],
+  },
+];
+
+const AdminSidebar: React.FC<Props> = ({
+  activeSection, onSectionChange, alertCount, mobileOpen, onMobileClose,
+}) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/', { replace: true });
-  };
-
+  const handleLogout = () => { logout(); navigate('/', { replace: true }); };
   const initials = user?.email ? getInitials(user.email) : 'AD';
+  const displayName = user?.email?.split('@')[0] || 'Admin';
+  const go = (s: Section) => { onSectionChange(s); onMobileClose?.(); };
 
   return (
     <>
-      <div
-        className={`adm-mobile-overlay${mobileOpen ? ' active' : ''}`}
-        onClick={onMobileClose}
-        aria-hidden="true"
-      />
-      <aside className={`adm-sidebar${mobileOpen ? ' adm-sidebar--open' : ''}`}>
-      {/* Logo */}
-      <div className="adm-logo-section">
-        <div className="adm-logo">
-          <div className="adm-logo-icon">
-            <Scale size={14} color="#fff" strokeWidth={2.5} />
-          </div>
-          <div className="adm-logo-wordmark">
-            <span className="adm-logo-text">FinGuardMY</span>
-            <span className="adm-logo-sub">Admin Console</span>
-          </div>
+      {mobileOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+            zIndex: 29,
+          }}
+          onClick={onMobileClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside className={`side${mobileOpen ? ' is-open' : ''}`}>
+        <div className="side__brand">
+          <div className="side__mark">F</div>
+          <div className="side__brand-name">FinGuardMY</div>
         </div>
-      </div>
 
-      {/* Nav */}
-      <nav className="adm-nav">
-        <div className="adm-nav-label">Management</div>
-
-        <button
-          className={`adm-nav-item${activeSection === 'users' ? ' active' : ''}`}
-          onClick={() => onSectionChange('users')}
-        >
-          <Users size={16} />
-          Users
-        </button>
-        <button
-          className={`adm-nav-item${activeSection === 'knowledge' ? ' active' : ''}`}
-          onClick={() => onSectionChange('knowledge')}
-        >
-          <BookOpen size={16} />
-          Knowledge Base
-        </button>
-        <button
-          className={`adm-nav-item${activeSection === 'documents' ? ' active' : ''}`}
-          onClick={() => onSectionChange('documents')}
-        >
-          <FileText size={16} />
-          Documents
-        </button>
-        <button
-          className={`adm-nav-item${activeSection === 'alerts' ? ' active' : ''}`}
-          onClick={() => onSectionChange('alerts')}
-        >
-          <ShieldAlert size={16} />
-          Alerts
-        </button>
-      </nav>
-
-      {/* User strip */}
-      <div className="adm-user-strip">
-        <div className="adm-user-info">
-          <div className="adm-user-avatar">{initials}</div>
-          <div className="adm-user-meta">
-            <div className="adm-user-email-text">{user?.email}</div>
-            <div className="adm-user-role-label">Administrator</div>
+        {GROUPS.map(g => (
+          <div key={g.label}>
+            <div className="side__nav-label">{g.label}</div>
+            <nav className="side__nav">
+              {g.items.map(({ id, label, Icon, badge }) => (
+                <button
+                  key={id}
+                  className={`side__item${activeSection === id ? ' is-active' : ''}`}
+                  onClick={() => go(id)}
+                >
+                  <Icon size={15} className="ico" />
+                  {label}
+                  {badge && alertCount != null && alertCount > 0 && (
+                    <span className="badge">{alertCount > 99 ? '99+' : alertCount}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
           </div>
-        </div>
-        <button className="adm-signout-btn" onClick={() => setShowLogoutConfirm(true)}>
-          Sign out
-        </button>
-      </div>
-    </aside>
+        ))}
 
-      {showLogoutConfirm && (
-        <div className="adm-modal-overlay" onClick={() => setShowLogoutConfirm(false)}>
+        <div className="side__spacer" />
+
+        <div className="side__health">
+          <span className="dot" />
+          <span>All systems operational</span>
+        </div>
+
+        <div className="side__user">
+          <div className="avatar">{initials}</div>
+          <div className="side__user-meta">
+            <span className="side__user-name">{displayName}</span>
+            <span className="side__user-role">Administrator</span>
+          </div>
+          <button className="side__signout" title="Sign out" onClick={() => setShowLogout(true)}>
+            <LogOut size={14} />
+          </button>
+        </div>
+      </aside>
+
+      {showLogout && (
+        <div className="adm-modal-overlay" onClick={() => setShowLogout(false)}>
           <div className="adm-modal" onClick={e => e.stopPropagation()}>
             <div className="adm-modal-title">Sign Out</div>
             <div className="adm-modal-sub">Are you sure you want to sign out of the Admin Console?</div>
             <div className="adm-modal-footer">
-              <button className="adm-btn-secondary" onClick={() => setShowLogoutConfirm(false)}>
-                Cancel
-              </button>
-              <button className="adm-btn-danger" onClick={handleLogout}>
-                Sign out
-              </button>
+              <button className="adm-btn-secondary" onClick={() => setShowLogout(false)}>Cancel</button>
+              <button className="adm-btn-danger" onClick={handleLogout}>Sign out</button>
             </div>
           </div>
         </div>

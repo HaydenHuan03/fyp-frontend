@@ -1,76 +1,136 @@
-// src/pages/admin/AdminDashboard.tsx
-import { useState } from 'react';
-import { Menu } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Bell, Menu, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import AdminSidebar from '../../components/admin/AdminSidebar';
+import Overview from './Overview';
 import UserManagement from './UserManagement';
 import KnowledgeBase from './KnowledgeBase';
 import Documents from './Documents';
+import Conversations from './Conversations';
+import CaseReports from './CaseReports';
 import Alerts from './Alerts';
+import BackgroundJobs from './BackgroundJobs';
+import AuditLog from './AuditLog';
+import { apiListAlerts } from '../../lib/api';
 
-type Section = 'users' | 'knowledge' | 'documents' | 'alerts';
+type Section =
+  | 'overview' | 'users' | 'knowledge' | 'documents'
+  | 'conversations' | 'reports' | 'alerts' | 'jobs' | 'audit';
 
-const SECTIONS: Section[] = ['users', 'knowledge', 'documents', 'alerts'];
-const SESSION_KEY = 'adm_section';
+const SECTIONS: Section[] = [
+  'overview', 'users', 'knowledge', 'documents',
+  'conversations', 'reports', 'alerts', 'jobs', 'audit',
+];
 
-function readSection(): Section {
-  const stored = sessionStorage.getItem(SESSION_KEY) as Section | null;
-  return stored && SECTIONS.includes(stored) ? stored : 'users';
-}
-
-const sectionLabel: Record<Section, string> = {
-  users:     'Manage Users',
-  knowledge: 'Knowledge Base',
-  documents: 'Documents',
-  alerts:    'Alerts',
+const LABELS: Record<Section, string> = {
+  overview: 'Overview', users: 'Users', knowledge: 'Knowledge base',
+  documents: 'Documents', conversations: 'Conversations', reports: 'Case reports',
+  alerts: 'Alerts', jobs: 'Background jobs', audit: 'Audit log',
 };
 
+const SESSION_KEY = 'adm_section';
+const THEME_KEY   = 'adm_theme';
+
+function readSection(): Section {
+  const s = sessionStorage.getItem(SESSION_KEY) as Section | null;
+  return s && SECTIONS.includes(s) ? s : 'overview';
+}
+function readTheme(): 'light' | 'dark' {
+  return (localStorage.getItem(THEME_KEY) as 'light' | 'dark') || 'light';
+}
+function initials(email: string): string {
+  const local = email.split('@')[0];
+  const parts = local.split(/[._-]/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return local.slice(0, 2).toUpperCase();
+}
 
 const AdminDashboard: React.FC = () => {
-  const [section, setSection] = useState<Section>(readSection);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [section, setSection]           = useState<Section>(readSection);
+  const [mobileSidebarOpen, setMobile]  = useState(false);
+  const [theme, setTheme]               = useState<'light' | 'dark'>(readTheme);
+  const [alertCount, setAlertCount]     = useState(0);
+  const { user } = useAuth();
 
-  const handleSectionChange = (s: Section) => {
+  const userInitials = user?.email ? initials(user.email) : 'AD';
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
+
+  const fetchAlertCount = useCallback(async () => {
+    if (!user) return;
+    try { setAlertCount((await apiListAlerts(user.accessToken)).length); }
+    catch { /* silent */ }
+  }, [user]);
+
+  useEffect(() => { fetchAlertCount(); }, [fetchAlertCount]);
+
+  const go = (s: Section) => {
     sessionStorage.setItem(SESSION_KEY, s);
     setSection(s);
   };
-  const { user } = useAuth();
-
-  const displayName = user?.email?.split('@')[0] || 'Admin';
 
   return (
-    <div className="adm-root">
+    <div className="app">
       <AdminSidebar
         activeSection={section}
-        onSectionChange={s => { handleSectionChange(s); setMobileSidebarOpen(false); }}
+        onSectionChange={go}
+        alertCount={alertCount}
         mobileOpen={mobileSidebarOpen}
-        onMobileClose={() => setMobileSidebarOpen(false)}
+        onMobileClose={() => setMobile(false)}
       />
-      <div className="adm-content">
-        <header className="adm-topbar">
+
+      <div className="adm-shell-body">
+        <header className="top">
+          {/* Mobile hamburger — hidden on desktop via CSS */}
           <button
             className="adm-mobile-menu-btn"
-            onClick={() => setMobileSidebarOpen(true)}
+            onClick={() => setMobile(true)}
             aria-label="Open navigation"
+            style={{ marginRight: 4 }}
           >
             <Menu size={18} />
           </button>
-          <div className="adm-breadcrumb">
-            FinGuardMY
-            <span className="adm-breadcrumb-sep">›</span>
-            <span className="adm-breadcrumb-current">{sectionLabel[section]}</span>
+
+          <div className="top__crumb">
+            <span>Admin</span>
+            <span className="sep">/</span>
+            <span className="here">{LABELS[section]}</span>
           </div>
-          <div className="adm-topbar-right">
-            Welcome, <strong>{displayName}</strong>
-            <span className="adm-admin-badge">admin</span>
+
+          <div className="top__cmd" role="search">
+            <Search size={14} />
+            <span>Search…</span>
+            <span className="kbd">⌘K</span>
           </div>
+
+          <button
+            className="top__icon"
+            onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+            title={theme === 'light' ? 'Dark mode' : 'Light mode'}
+          >
+            {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
+          </button>
+
+          <button className="top__icon" title="Notifications">
+            <Bell size={15} />
+            {alertCount > 0 && <span className="top__icon-dot" />}
+          </button>
+
+          <div className="avatar" title={user?.email}>{userInitials}</div>
         </header>
-        <main className="adm-main">
-          {section === 'users'     && <UserManagement />}
-          {section === 'knowledge' && <KnowledgeBase />}
-          {section === 'documents' && <Documents />}
-          {section === 'alerts'    && <Alerts />}
-        </main>
+
+        {section === 'overview'      && <Overview />}
+        {section === 'users'         && <UserManagement />}
+        {section === 'knowledge'     && <KnowledgeBase />}
+        {section === 'documents'     && <Documents />}
+        {section === 'conversations' && <Conversations />}
+        {section === 'reports'       && <CaseReports />}
+        {section === 'alerts'        && <Alerts />}
+        {section === 'jobs'          && <BackgroundJobs />}
+        {section === 'audit'         && <AuditLog />}
       </div>
     </div>
   );

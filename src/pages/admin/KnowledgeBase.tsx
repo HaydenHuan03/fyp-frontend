@@ -1,19 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader, X, RefreshCw, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Loader, X, RefreshCw, Eye, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
-  apiListDocuments,
-  apiUploadDocuments,
-  apiIngestDocuments,
-  apiDeleteDocument,
-  apiListDocumentChunks,
-  type DocumentListItem,
-  type IngestStatus,
-  type ChunkPreviewItem,
+  apiListDocuments, apiUploadDocuments, apiIngestDocuments,
+  apiDeleteDocument, apiListDocumentChunks,
+  type DocumentListItem, type IngestStatus, type ChunkPreviewItem,
 } from '../../lib/api';
 import { useToast } from '../../hooks/useToast';
 import { formatDate } from '../../lib/utils';
 import { IngestStatusBadge } from '../../components/admin/IngestStatusBadge';
+import StatTile from '../../components/admin/StatTile';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -22,7 +18,7 @@ function formatBytes(bytes: number): string {
 }
 
 const StatusCell: React.FC<{ status: IngestStatus }> = ({ status }) => (
-  <div className="kb-status-cell">
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 130 }}>
     <IngestStatusBadge status={status} />
     <div className="kb-progress-track">
       <div className={`kb-progress-fill kb-progress-fill--${status}`} />
@@ -42,31 +38,27 @@ const PAGE_SIZE = 10;
 
 const KnowledgeBase: React.FC = () => {
   const { user } = useAuth();
-  const [docs, setDocs] = useState<DocumentListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dragging, setDragging] = useState(false);
+  const [docs, setDocs]           = useState<DocumentListItem[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [dragging, setDragging]   = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [reIngestingId, setReIngestingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [chunksModal, setChunksModal] = useState<ChunksModal | null>(null);
+  const [search, setSearch]       = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | IngestStatus>('all');
   const { toasts, toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
-    try {
-      const data = await apiListDocuments(user!.accessToken);
-      setDocs(data);
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Failed to load documents', 'error');
-    } finally {
-      setLoading(false);
-    }
+    try { setDocs(await apiListDocuments(user!.accessToken)); }
+    catch (e) { toast(e instanceof Error ? e.message : 'Failed to load documents', 'error'); }
+    finally { setLoading(false); }
   }, [user, toast]);
 
   useEffect(() => { load(); }, [load]);
 
-  // Poll every 4 s while any document is still pending or ingesting.
   useEffect(() => {
     const hasActive = docs.some(d => d.ingest_status === 'pending' || d.ingest_status === 'ingesting');
     if (!hasActive) return;
@@ -74,46 +66,16 @@ const KnowledgeBase: React.FC = () => {
     return () => clearInterval(id);
   }, [docs, load]);
 
-  const handleReIngest = async (id: number, filename: string) => {
-    setReIngestingId(id);
-    try {
-      const results = await apiIngestDocuments(user!.accessToken, [id]);
-      const result = results[0];
-      if (!result?.error) {
-        toast(`"${filename}" re-ingestion started.`, 'success');
-      } else {
-        toast(`"${filename}": ${result.error}`, 'error');
-      }
-      await load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Re-ingestion failed', 'error');
-    } finally {
-      setReIngestingId(null);
-    }
-  };
-
   const stageFiles = (incoming: File[]) => {
-    const accepted = incoming.filter(f => {
-      const name = f.name.toLowerCase();
-      return name.endsWith('.pdf') || name.endsWith('.json');
-    });
+    const accepted = incoming.filter(f => f.name.toLowerCase().endsWith('.pdf') || f.name.toLowerCase().endsWith('.json'));
     const rejected = incoming.length - accepted.length;
-    if (rejected > 0) toast(`${rejected} file(s) skipped — only PDF or JSON files are accepted.`, 'error');
+    if (rejected > 0) toast(`${rejected} file(s) skipped — only PDF or JSON accepted.`, 'error');
     if (!accepted.length) return;
     setStagedFiles(prev => {
       const existing = new Set(prev.map(f => f.name));
       const seen = new Set<string>();
-      const deduped = accepted.filter(f => {
-        if (existing.has(f.name) || seen.has(f.name)) return false;
-        seen.add(f.name);
-        return true;
-      });
-      return [...prev, ...deduped];
+      return [...prev, ...accepted.filter(f => { if (existing.has(f.name) || seen.has(f.name)) return false; seen.add(f.name); return true; })];
     });
-  };
-
-  const removeStagedFile = (name: string) => {
-    setStagedFiles(prev => prev.filter(f => f.name !== name));
   };
 
   const handleConfirmUpload = async () => {
@@ -121,30 +83,37 @@ const KnowledgeBase: React.FC = () => {
     const files = [...stagedFiles];
     setStagedFiles([]);
     setUploading(true);
-
     try {
       const results = await apiUploadDocuments(user!.accessToken, files);
-      const succeeded = results.filter(r => r.success);
-      const failed = results.filter(r => !r.success);
-      if (succeeded.length) toast(`${succeeded.length} file(s) uploaded. Ingestion running in background…`, 'success');
-      failed.forEach(r => toast(`"${r.filename}": ${r.error ?? 'Upload failed'}`, 'error'));
+      const ok = results.filter(r => r.success);
+      results.filter(r => !r.success).forEach(r => toast(`"${r.filename}": ${r.error ?? 'Upload failed'}`, 'error'));
+      if (ok.length) toast(`${ok.length} file(s) uploaded. Ingestion running…`, 'success');
       await load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Upload failed', 'error');
-    } finally {
-      setUploading(false);
-    }
+    } catch (e) { toast(e instanceof Error ? e.message : 'Upload failed', 'error'); }
+    finally { setUploading(false); }
   };
 
-const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    stageFiles(Array.from(e.dataTransfer.files));
+  const handleReIngest = async (id: number, filename: string) => {
+    setReIngestingId(id);
+    try {
+      const results = await apiIngestDocuments(user!.accessToken, [id]);
+      const r = results[0];
+      if (!r?.error) toast(`"${filename}" re-ingestion started.`, 'success');
+      else toast(`"${filename}": ${r.error}`, 'error');
+      await load();
+    } catch (e) { toast(e instanceof Error ? e.message : 'Re-ingestion failed', 'error'); }
+    finally { setReIngestingId(null); }
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    stageFiles(Array.from(e.target.files ?? []));
-    e.target.value = '';
+  const handleDelete = async (id: number, filename: string) => {
+    if (!confirm(`Delete "${filename}"? This cannot be undone.`)) return;
+    setDeletingId(id);
+    try {
+      await apiDeleteDocument(user!.accessToken, id);
+      toast(`"${filename}" deleted.`, 'success');
+      setDocs(p => p.filter(d => d.id !== id));
+    } catch (e) { toast(e instanceof Error ? e.message : 'Delete failed', 'error'); }
+    finally { setDeletingId(null); }
   };
 
   const handleViewChunks = async (doc: DocumentListItem, page = 0) => {
@@ -159,228 +128,154 @@ const handleDrop = (e: React.DragEvent) => {
     }
   };
 
-  const handleDelete = async (id: number, filename: string) => {
-    if (!confirm(`Delete "${filename}"? This cannot be undone.`)) return;
-    setDeletingId(id);
-    try {
-      await apiDeleteDocument(user!.accessToken, id);
-      toast(`"${filename}" deleted.`, 'success');
-      setDocs(p => p.filter(d => d.id !== id));
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Delete failed', 'error');
-    } finally {
-      setDeletingId(null);
-    }
-  };
+  const filtered = docs.filter(d => {
+    if (statusFilter !== 'all' && d.ingest_status !== statusFilter) return false;
+    if (search && !d.filename.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
   const total    = docs.length;
   const ingested = docs.filter(d => d.ingest_status === 'ingested').length;
-  const pending  = docs.filter(d => d.ingest_status === 'pending').length;
-  const busy     = uploading;
+  const pending  = docs.filter(d => d.ingest_status === 'pending' || d.ingest_status === 'ingesting').length;
 
   return (
-    <div>
-      {/* Page header */}
-      <div className="adm-page-header">
+    <div className="page">
+      <div className="page__head">
         <div>
-          <div className="adm-page-title">Knowledge Base</div>
-          <div className="adm-page-sub">Manage PDF and JSON documents ingested into the RAG knowledge base.</div>
+          <h1 className="page__title">Knowledge base</h1>
+          <div className="page__sub">Ingest, monitor and manage the corpus that powers retrieval.</div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="adm-stats">
-        <div className="adm-stat-card">
-          <div className="adm-stat-icon adm-stat-icon--indigo">
-            <FileText size={18} color="var(--adm-accent)" />
-          </div>
-          <div className="adm-stat-body">
-            <div className="adm-stat-value adm-stat-value--indigo">{total}</div>
-            <div className="adm-stat-label">Total Documents</div>
-          </div>
+      <div className="stats">
+        <StatTile label="Documents"   value={total}    delta="+0" dir="flat" period="7-day intake" spark={[12,14,16,15,18,20,22,24,26,28,total||1]} />
+        <StatTile label="Ingested"    value={ingested} delta="+0" dir="flat" period="last 7 days"  spark={[10,12,13,15,17,18,20,22,24,25,ingested||1]} />
+        <StatTile label="In progress" value={pending}  delta="0"  dir="flat" period="awaiting"     spark={[3,2,3,4,2,3,2,3,4,2,pending||0]} />
+      </div>
+
+      <div className="kb-grid">
+        <div
+          className={`dropzone${dragging ? ' is-drag' : ''}`}
+          onDragOver={e => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={e => { e.preventDefault(); setDragging(false); stageFiles(Array.from(e.dataTransfer.files)); }}
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => e.key === 'Enter' && !uploading && fileInputRef.current?.click()}
+        >
+          <input ref={fileInputRef} type="file" accept=".pdf,.json" multiple style={{ display: 'none' }} onChange={e => { stageFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
+          <div className="dropzone__icon"><Upload size={18} /></div>
+          <div className="dropzone__title">Drop files to upload</div>
+          <div className="dropzone__hint">PDF or JSON · up to 1 GB · multiple supported</div>
+          <button className="btn btn--ghost btn--sm" style={{ marginTop: 4 }}>Choose files</button>
         </div>
-        <div className="adm-stat-card">
-          <div className="adm-stat-icon adm-stat-icon--green">
-            <CheckCircle size={18} color="var(--adm-success)" />
-          </div>
-          <div className="adm-stat-body">
-            <div className="adm-stat-value adm-stat-value--green">{ingested}</div>
-            <div className="adm-stat-label">Ingested</div>
-          </div>
-        </div>
-        <div className="adm-stat-card">
-          <div className="adm-stat-icon" style={{ background: 'var(--adm-warning-tint)' }}>
-            <Clock size={18} color="var(--adm-warning)" />
-          </div>
-          <div className="adm-stat-body">
-            <div className="adm-stat-value" style={{ color: 'var(--adm-warning)' }}>{pending}</div>
-            <div className="adm-stat-label">Awaiting Ingest</div>
+        <div className="kb-side">
+          <h4>How ingestion works</h4>
+          <div className="kb-side__list">
+            <div className="kb-side__item"><span className="num">01</span><span>Upload accepts PDF and JSON. Files over 1 GB are rejected.</span></div>
+            <div className="kb-side__item"><span className="num">02</span><span>Documents are split into chunks and embedded — usually within a few minutes.</span></div>
+            <div className="kb-side__item"><span className="num">03</span><span>Once ingested, content becomes available to the assistant for retrieval.</span></div>
+            <div className="kb-side__item"><span className="num">04</span><span>Re-ingest or delete any document at any time. Failed jobs can be retried.</span></div>
           </div>
         </div>
       </div>
 
-      {/* Upload dropzone */}
-      <div
-        className={`kb-dropzone${dragging ? ' kb-dropzone--active' : ''}`}
-        onDragOver={e => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => !busy && fileInputRef.current?.click()}
-        role="button"
-        tabIndex={0}
-        aria-label="Select PDF or JSON files — click or drag and drop"
-        onKeyDown={e => e.key === 'Enter' && !busy && fileInputRef.current?.click()}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.json,application/pdf,application/json"
-          multiple
-          style={{ display: 'none' }}
-          onChange={handleFileInput}
-        />
-        <div className="kb-dropzone-icon">
-          <Upload size={22} color={dragging ? 'var(--adm-accent)' : 'var(--adm-text-sub)'} />
-        </div>
-        <div className="kb-dropzone-text">
-          {dragging ? 'Drop to add' : 'Click or drag PDF or JSON files to add'}
-        </div>
-        <div className="kb-dropzone-hint">PDF or JSON · Max 1GB per file · Multiple files supported</div>
-      </div>
-
-      {/* Staged file queue */}
+      {/* Staged files */}
       {stagedFiles.length > 0 && (
-        <div className="kb-staged-panel">
+        <div className="kb-staged-panel" style={{ marginBottom: 20 }}>
           <div className="kb-staged-header">
-            <span className="kb-staged-title">
-              {stagedFiles.length} file{stagedFiles.length !== 1 ? 's' : ''} ready to upload
-            </span>
+            <span className="kb-staged-title">{stagedFiles.length} file{stagedFiles.length !== 1 ? 's' : ''} ready to upload</span>
             <div className="kb-staged-actions">
-              <button
-                className="adm-btn-secondary"
-                onClick={() => setStagedFiles([])}
-                disabled={busy}
-              >
-                Clear all
-              </button>
-              <button
-                className="adm-btn-primary"
-                onClick={handleConfirmUpload}
-                disabled={busy}
-              >
-                {busy ? <Loader size={14} className="kb-spin" /> : <Upload size={14} />}
-                Confirm Upload
+              <button className="btn btn--ghost btn--sm" onClick={() => setStagedFiles([])} disabled={uploading}>Clear all</button>
+              <button className="btn btn--primary btn--sm" onClick={handleConfirmUpload} disabled={uploading}>
+                {uploading ? <Loader size={13} className="kb-spin" /> : <Upload size={13} />}
+                Confirm upload
               </button>
             </div>
           </div>
           <ul className="kb-staged-list">
             {stagedFiles.map(f => (
               <li key={f.name} className="kb-staged-item">
-                <div className="kb-file-icon" aria-hidden="true"><FileText size={14} /></div>
+                <div className="file-icon"><FileText size={13} /></div>
                 <span className="kb-staged-name">{f.name}</span>
                 <span className="kb-staged-size">{formatBytes(f.size)}</span>
-                <button
-                  className="kb-staged-remove"
-                  onClick={() => removeStagedFile(f.name)}
-                  aria-label={`Remove ${f.name}`}
-                  disabled={busy}
-                >
-                  <X size={13} />
-                </button>
+                <button className="kb-staged-remove" onClick={() => setStagedFiles(p => p.filter(x => x.name !== f.name))} disabled={uploading}><X size={13} /></button>
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {/* Processing status */}
-      {busy && (
-        <div className="kb-processing-bar">
+      {uploading && (
+        <div className="kb-processing-bar" style={{ marginBottom: 20 }}>
           <Loader size={14} className="kb-spin" />
           Uploading files…
         </div>
       )}
 
       {/* Documents table */}
-      <div className="adm-table-card">
-        <div className="adm-table-toolbar">
-          <span className="adm-user-count">{total} document{total !== 1 ? 's' : ''}</span>
+      <div className="card">
+        <div className="toolbar">
+          <div className="search">
+            <Search size={14} />
+            <input placeholder="Search documents" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <div className="chips">
+            <button className={`chip${statusFilter === 'all'       ? ' is-on' : ''}`} onClick={() => setStatusFilter('all')}>All</button>
+            <button className={`chip${statusFilter === 'ingested'  ? ' is-on' : ''}`} onClick={() => setStatusFilter('ingested')}>Ingested</button>
+            <button className={`chip${statusFilter === 'ingesting' ? ' is-on' : ''}`} onClick={() => setStatusFilter('ingesting')}>In progress</button>
+            <button className={`chip${statusFilter === 'failed'    ? ' is-on' : ''}`} onClick={() => setStatusFilter('failed')}>Failed</button>
+          </div>
+          <span className="toolbar__count">{filtered.length} documents</span>
         </div>
+
         {loading ? (
-          <div className="kb-empty-state">Loading…</div>
-        ) : docs.length === 0 ? (
-          <div className="kb-empty-state">
-            <FileText size={32} color="var(--adm-text-sub)" />
-            <p>No documents uploaded yet.</p>
+          <div className="empty"><Loader size={20} style={{ animation: 'kb-rotate 1s linear infinite', color: 'var(--ink-4)' }} /></div>
+        ) : filtered.length === 0 ? (
+          <div className="empty">
+            <FileText size={28} className="ico" />
+            <span className="t">No documents</span>
+            <span className="s">Upload PDF or JSON files above to get started.</span>
           </div>
         ) : (
-          <>
-          <div className="adm-table-wrap adm-hide-mobile">
-            <table className="adm-table">
+          <div className="table-wrap">
+            <table className="t">
               <thead>
                 <tr>
                   <th>Document</th>
-                  <th>Uploaded By</th>
+                  <th>Uploaded by</th>
                   <th>Uploaded</th>
-                  <th>Chunks</th>
+                  <th style={{ textAlign: 'right' }}>Chunks</th>
                   <th>Status</th>
-                  <th>Actions</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {docs.map(doc => (
+                {filtered.map(doc => (
                   <tr key={doc.id}>
                     <td>
-                      <div className="kb-filename-cell">
-                        <div className="kb-file-icon" aria-hidden="true">
-                          <FileText size={14} />
-                        </div>
-                        <span className="kb-filename">{doc.filename}</span>
+                      <div className="file-cell">
+                        <div className="file-icon"><FileText size={13} /></div>
+                        <span className="file-name">{doc.filename}</span>
                       </div>
                     </td>
-                    <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
-                      {doc.uploaded_by}
-                    </td>
-                    <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
-                      {formatDate(doc.uploaded_at)}
-                    </td>
-                    <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
-                      {doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}
-                    </td>
+                    <td className="muted">{doc.uploaded_by}</td>
+                    <td className="num muted">{formatDate(doc.uploaded_at)}</td>
+                    <td className="num" style={{ textAlign: 'right' }}>{doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}</td>
                     <td><StatusCell status={doc.ingest_status} /></td>
                     <td>
-                      <div className="adm-row-actions">
+                      <div className="row-actions">
                         {doc.ingest_status === 'ingested' && doc.chunk_count > 0 && (
-                          <button
-                            className="adm-row-btn"
-                            title="Preview chunks"
-                            onClick={() => handleViewChunks(doc)}
-                            aria-label={`Preview chunks for ${doc.filename}`}
-                          >
-                            <Eye size={14} />
-                          </button>
+                          <button className="row-btn" title="Preview chunks" onClick={() => handleViewChunks(doc)}><Eye size={13} /></button>
                         )}
                         {doc.ingest_status === 'failed' && (
-                          <button
-                            className="adm-row-btn"
-                            title="Re-ingest document"
-                            disabled={reIngestingId === doc.id}
-                            onClick={() => handleReIngest(doc.id, doc.filename)}
-                            aria-label={`Re-ingest ${doc.filename}`}
-                          >
-                            {reIngestingId === doc.id
-                              ? <Loader size={14} className="kb-spin" />
-                              : <RefreshCw size={14} />}
+                          <button className="row-btn" title="Re-ingest" disabled={reIngestingId === doc.id} onClick={() => handleReIngest(doc.id, doc.filename)}>
+                            {reIngestingId === doc.id ? <Loader size={13} className="kb-spin" /> : <RefreshCw size={13} />}
                           </button>
                         )}
-                        <button
-                          className="adm-row-btn adm-row-btn--danger"
-                          title="Delete document"
-                          disabled={deletingId === doc.id}
-                          onClick={() => handleDelete(doc.id, doc.filename)}
-                          aria-label={`Delete ${doc.filename}`}
-                        >
-                          <Trash2 size={14} />
+                        <button className="row-btn row-btn--danger" title="Delete" disabled={deletingId === doc.id} onClick={() => handleDelete(doc.id, doc.filename)}>
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </td>
@@ -389,140 +284,50 @@ const handleDrop = (e: React.DragEvent) => {
               </tbody>
             </table>
           </div>
-
-          {/* Mobile cards */}
-          <div className="adm-mobile-cards adm-show-mobile">
-            {docs.map(doc => (
-              <div key={doc.id} className="adm-mobile-card">
-                <div className="adm-mobile-card-header">
-                  <div className="kb-filename-cell" style={{ flex: 1, minWidth: 0 }}>
-                    <div className="kb-file-icon" aria-hidden="true">
-                      <FileText size={14} />
-                    </div>
-                    <span className="kb-filename">{doc.filename}</span>
-                  </div>
-                  <div className="adm-row-actions">
-                    {doc.ingest_status === 'ingested' && doc.chunk_count > 0 && (
-                      <button
-                        className="adm-row-btn"
-                        title="Preview chunks"
-                        onClick={() => handleViewChunks(doc)}
-                        aria-label={`Preview chunks for ${doc.filename}`}
-                      >
-                        <Eye size={14} />
-                      </button>
-                    )}
-                    {doc.ingest_status === 'failed' && (
-                      <button
-                        className="adm-row-btn"
-                        title="Re-ingest document"
-                        disabled={reIngestingId === doc.id}
-                        onClick={() => handleReIngest(doc.id, doc.filename)}
-                        aria-label={`Re-ingest ${doc.filename}`}
-                      >
-                        {reIngestingId === doc.id
-                          ? <Loader size={14} className="kb-spin" />
-                          : <RefreshCw size={14} />}
-                      </button>
-                    )}
-                    <button
-                      className="adm-row-btn adm-row-btn--danger"
-                      title="Delete document"
-                      disabled={deletingId === doc.id}
-                      onClick={() => handleDelete(doc.id, doc.filename)}
-                      aria-label={`Delete ${doc.filename}`}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-                <div className="adm-mobile-card-details">
-                  <div className="adm-mobile-card-detail">
-                    <span className="adm-mobile-card-label">By</span>
-                    <span className="adm-mobile-card-value">{doc.uploaded_by}</span>
-                  </div>
-                  <div className="adm-mobile-card-detail">
-                    <span className="adm-mobile-card-label">Date</span>
-                    <span className="adm-mobile-card-value">{formatDate(doc.uploaded_at)}</span>
-                  </div>
-                  <div className="adm-mobile-card-detail">
-                    <span className="adm-mobile-card-label">Chunks</span>
-                    <span className="adm-mobile-card-value">{doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}</span>
-                  </div>
-                </div>
-                <div className="adm-mobile-card-footer">
-                  <StatusCell status={doc.ingest_status} />
-                </div>
-              </div>
-            ))}
-          </div>
-          </>
         )}
       </div>
 
-      {/* Chunks viewer modal */}
+      {/* Chunks modal */}
       {chunksModal && (
         <div className="adm-modal-overlay" onClick={() => setChunksModal(null)}>
-          <div className="adm-modal" style={{ maxWidth: '720px', width: '100%' }} onClick={e => e.stopPropagation()}>
+          <div className="adm-modal" style={{ maxWidth: 720 }} onClick={e => e.stopPropagation()}>
             <div className="adm-modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>Chunk Preview — {chunksModal.doc.filename}</span>
-              <button className="kb-staged-remove" onClick={() => setChunksModal(null)} aria-label="Close"><X size={16} /></button>
+              <span>Chunks — {chunksModal.doc.filename}</span>
+              <button style={{ display: 'flex', cursor: 'pointer' }} onClick={() => setChunksModal(null)}><X size={16} /></button>
             </div>
             <div className="adm-modal-sub">
-              {chunksModal.total.toLocaleString()} total chunk{chunksModal.total !== 1 ? 's' : ''} · page {chunksModal.page + 1} of {Math.ceil(chunksModal.total / PAGE_SIZE)}
+              {chunksModal.total.toLocaleString()} chunk{chunksModal.total !== 1 ? 's' : ''} · page {chunksModal.page + 1} of {Math.ceil(chunksModal.total / PAGE_SIZE)}
             </div>
             {chunksModal.loading ? (
-              <div className="kb-empty-state"><Loader size={20} className="kb-spin" /></div>
-            ) : chunksModal.chunks.length === 0 ? (
-              <div className="kb-empty-state">No chunks on this page.</div>
+              <div className="empty"><Loader size={18} style={{ animation: 'kb-rotate 1s linear infinite', color: 'var(--ink-4)' }} /></div>
             ) : (
-              <div style={{ maxHeight: '420px', overflowY: 'auto', marginTop: '12px' }}>
+              <div style={{ maxHeight: 420, overflowY: 'auto', marginTop: 12 }}>
                 {chunksModal.chunks.map((chunk, i) => (
-                  <div key={chunk.id} style={{ padding: '12px', borderBottom: '1px solid var(--adm-border)', fontSize: '13px' }}>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'baseline' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--adm-accent)', minWidth: '28px' }}>#{chunksModal.page * PAGE_SIZE + i + 1}</span>
-                      <span style={{ color: 'var(--adm-text-sub)', fontSize: '11px', fontFamily: 'monospace' }}>{chunk.id}</span>
+                  <div key={chunk.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--line-2)', fontSize: 13 }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 28 }}>#{chunksModal.page * PAGE_SIZE + i + 1}</span>
+                      <span style={{ color: 'var(--ink-4)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>{chunk.id}</span>
                     </div>
-                    <div style={{ color: 'var(--adm-text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{chunk.text}</div>
-                    {Object.keys(chunk.metadata).length > 0 && (
-                      <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {Object.entries(chunk.metadata).map(([k, v]) => (
-                          <span key={k} style={{ fontSize: '11px', background: 'var(--adm-accent-tint)', color: 'var(--adm-accent)', borderRadius: '4px', padding: '2px 6px' }}>
-                            {k}: {String(v)}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <div style={{ color: 'var(--ink-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{chunk.text}</div>
                   </div>
                 ))}
               </div>
             )}
             <div className="adm-modal-footer">
-              <button
-                className="adm-btn-secondary"
-                disabled={chunksModal.page === 0 || chunksModal.loading}
-                onClick={() => handleViewChunks(chunksModal.doc, chunksModal.page - 1)}
-              >
-                <ChevronLeft size={14} /> Prev
+              <button className="btn btn--ghost btn--sm" disabled={chunksModal.page === 0 || chunksModal.loading} onClick={() => handleViewChunks(chunksModal.doc, chunksModal.page - 1)}>
+                <ChevronLeft size={13} /> Prev
               </button>
-              <button
-                className="adm-btn-secondary"
-                disabled={chunksModal.loading || (chunksModal.page + 1) * PAGE_SIZE >= chunksModal.total}
-                onClick={() => handleViewChunks(chunksModal.doc, chunksModal.page + 1)}
-              >
-                Next <ChevronRight size={14} />
+              <button className="btn btn--ghost btn--sm" disabled={chunksModal.loading || (chunksModal.page + 1) * PAGE_SIZE >= chunksModal.total} onClick={() => handleViewChunks(chunksModal.doc, chunksModal.page + 1)}>
+                Next <ChevronRight size={13} />
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Toasts */}
       {toasts.map(t => (
-        <div key={t.id} className={`adm-toast ${t.type}`} role="status" aria-live="polite">
-          {t.type === 'success'
-            ? <CheckCircle size={16} color="var(--adm-success)" />
-            : <AlertCircle size={16} color="var(--adm-danger)" />}
+        <div key={t.id} className={`adm-toast ${t.type}`} role="status">
+          {t.type === 'success' ? <CheckCircle size={15} color="var(--success)" /> : <AlertCircle size={15} color="var(--danger)" />}
           {t.msg}
         </div>
       ))}

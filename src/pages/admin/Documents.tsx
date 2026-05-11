@@ -1,80 +1,77 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, User } from 'lucide-react';
+import { FileText, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiListDocuments, type DocumentListItem } from '../../lib/api';
 import { formatDate } from '../../lib/utils';
 import { IngestStatusBadge } from '../../components/admin/IngestStatusBadge';
 
+function initials(name: string): string {
+  return name.split(/\s+/).slice(0, 2).map(s => s[0]).join('').toUpperCase();
+}
+
 const Documents: React.FC = () => {
   const { user } = useAuth();
-  const [docs, setDocs] = useState<DocumentListItem[]>([]);
+  const [docs, setDocs]     = useState<DocumentListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError]   = useState('');
 
   const load = useCallback(async () => {
-    try {
-      const data = await apiListDocuments(user!.accessToken);
-      setDocs(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load documents');
-    } finally {
-      setLoading(false);
-    }
+    try { setDocs(await apiListDocuments(user!.accessToken)); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Failed to load documents'); }
+    finally { setLoading(false); }
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
 
-  // Group by uploader
   const grouped = docs.reduce<Record<string, DocumentListItem[]>>((acc, doc) => {
     (acc[doc.uploaded_by] ??= []).push(doc);
     return acc;
   }, {});
-
   const uploaders = Object.keys(grouped).sort();
 
   return (
-    <div>
-      <div className="adm-page-header">
+    <div className="page">
+      <div className="page__head">
         <div>
-          <div className="adm-page-title">Documents</div>
-          <div className="adm-page-sub">All uploaded documents, grouped by who uploaded them.</div>
+          <h1 className="page__title">Documents</h1>
+          <div className="page__sub">All uploaded documents, grouped by who uploaded them.</div>
         </div>
       </div>
 
-      {loading && <div className="kb-empty-state">Loading…</div>}
+      {loading && (
+        <div className="empty"><span className="s">Loading…</span></div>
+      )}
 
       {error && (
-        <div className="adm-notice danger" style={{ marginBottom: 0 }}>{error}</div>
+        <div className="adm-notice danger" style={{ marginBottom: 16 }}>{error}</div>
       )}
 
       {!loading && !error && docs.length === 0 && (
-        <div className="kb-empty-state">
-          <FileText size={32} color="var(--adm-text-sub)" />
-          <p>No documents have been uploaded yet.</p>
+        <div className="empty">
+          <FileText size={28} className="ico" />
+          <span className="t">No documents uploaded yet</span>
         </div>
       )}
 
       {!loading && !error && uploaders.map(uploader => (
-        <div key={uploader} className="adm-table-card" style={{ marginBottom: '20px' }}>
-          <div className="adm-table-toolbar">
-            <div className="docs-uploader-row">
-              <div className="docs-uploader-avatar" aria-hidden="true">
-                <User size={13} />
-              </div>
-              <span className="docs-uploader-name">{uploader}</span>
-              <span className="adm-user-count">
-                {grouped[uploader].length} file{grouped[uploader].length !== 1 ? 's' : ''}
-              </span>
+        <div key={uploader} className="card docs-card">
+          <div className="docs-card__head">
+            <div className="avatar">{initials(uploader)}</div>
+            <div>
+              <div className="name">{uploader}</div>
+              <div className="meta">{grouped[uploader].length} file{grouped[uploader].length !== 1 ? 's' : ''}</div>
+            </div>
+            <div className="right">
+              <button className="btn btn--ghost btn--sm"><ExternalLink size={12} /> View profile</button>
             </div>
           </div>
-          {/* Desktop table */}
-          <div className="adm-table-wrap adm-hide-mobile">
-            <table className="adm-table">
+          <div className="table-wrap">
+            <table className="t">
               <thead>
                 <tr>
                   <th>Document</th>
                   <th>Uploaded</th>
-                  <th>Chunks</th>
+                  <th style={{ textAlign: 'right' }}>Chunks</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -82,17 +79,13 @@ const Documents: React.FC = () => {
                 {grouped[uploader].map(doc => (
                   <tr key={doc.id}>
                     <td>
-                      <div className="kb-filename-cell">
-                        <div className="kb-file-icon" aria-hidden="true">
-                          <FileText size={14} />
-                        </div>
-                        <span className="kb-filename">{doc.filename}</span>
+                      <div className="file-cell">
+                        <div className="file-icon"><FileText size={13} /></div>
+                        <span className="file-name">{doc.filename}</span>
                       </div>
                     </td>
-                    <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
-                      {formatDate(doc.uploaded_at)}
-                    </td>
-                    <td style={{ color: 'var(--adm-text-muted)', fontSize: '12px' }}>
+                    <td className="num muted">{formatDate(doc.uploaded_at)}</td>
+                    <td className="num" style={{ textAlign: 'right' }}>
                       {doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}
                     </td>
                     <td><IngestStatusBadge status={doc.ingest_status} /></td>
@@ -100,33 +93,6 @@ const Documents: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-
-          {/* Mobile cards */}
-          <div className="adm-mobile-cards adm-show-mobile">
-            {grouped[uploader].map(doc => (
-              <div key={doc.id} className="adm-mobile-card">
-                <div className="adm-mobile-card-header">
-                  <div className="kb-filename-cell" style={{ flex: 1, minWidth: 0 }}>
-                    <div className="kb-file-icon" aria-hidden="true">
-                      <FileText size={14} />
-                    </div>
-                    <span className="kb-filename">{doc.filename}</span>
-                  </div>
-                  <IngestStatusBadge status={doc.ingest_status} />
-                </div>
-                <div className="adm-mobile-card-details">
-                  <div className="adm-mobile-card-detail">
-                    <span className="adm-mobile-card-label">Uploaded</span>
-                    <span className="adm-mobile-card-value">{formatDate(doc.uploaded_at)}</span>
-                  </div>
-                  <div className="adm-mobile-card-detail">
-                    <span className="adm-mobile-card-label">Chunks</span>
-                    <span className="adm-mobile-card-value">{doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       ))}

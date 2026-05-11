@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiLogin, roleFromToken } from '../lib/api';
-import { Scale, Shield, Search, User, Lock, Eye, EyeOff } from 'lucide-react';
+import { Shield, Search, User, Lock, Eye, EyeOff } from 'lucide-react';
 
 const ROLE_HOME = { admin: '/admin/dashboard', user: '/dashboard' } as const;
 
@@ -38,64 +38,53 @@ const LoginPage: React.FC = () => {
   return (
     <div className="lg-root">
 
-      {/* ═══════════ LEFT 60% ═══════════ */}
+      {/* ── Left panel ── */}
       <div className="lg-left">
-        <div className="lg-circle lg-c1" aria-hidden />
-        <div className="lg-circle lg-c2" aria-hidden />
-        <div className="lg-circle lg-c3" aria-hidden />
-        <div className="lg-circle lg-c4" aria-hidden />
-
-        {/* Logo */}
         <div className="lg-logo">
-          <Scale size={22} color="#fff" strokeWidth={2.2} />
+          <div className="lg-logo-mark">F</div>
           <span className="lg-logo-text">FinGuardMY</span>
         </div>
 
-        {/* Headline */}
         <div className="lg-headline">
-          <h1>Hey<br />Welcome To<br />FinGuard AI</h1>
-          <p>AI Assistant For Financial Crime Analysis</p>
+          <h1>Financial Crime<br />Analysis<br />Platform.</h1>
+          <p>AI-powered tools for investigators — case reports, legal precedents, and document retrieval in one place.</p>
         </div>
 
-        {/* Features */}
         <div className="lg-feats">
           <div className="lg-feat">
             <div className="lg-feat-icon">
-              <Shield size={15} color="rgba(255,255,255,0.95)" />
+              <Shield size={13} />
             </div>
-            Advanced Security &amp; Compliance
+            Advanced security &amp; compliance
           </div>
           <div className="lg-feat">
             <div className="lg-feat-icon">
-              <Search size={15} color="rgba(255,255,255,0.95)" />
+              <Search size={13} />
             </div>
-            Reliable Analysis &amp; Suggestions
+            Reliable analysis &amp; suggestions
           </div>
         </div>
       </div>
 
-      {/* ═══════════ RIGHT 40% ═══════════ */}
+      {/* ── Right panel ── */}
       <div className="lg-right">
         <div className="lg-form-box">
 
-          <h2 className="lg-title f1">Login</h2>
+          <h2 className="lg-title">Sign in</h2>
 
           <form onSubmit={onSubmit}>
 
-            {/* Email / Username */}
-            <div className="lg-field f2">
-              <label htmlFor="email" className="lg-label">Email or Username</label>
+            <div className="lg-field">
+              <label htmlFor="email" className="lg-label">Email or username</label>
               <div className="lg-wrap">
-                <span className="lg-icon">
-                  <User size={15} />
-                </span>
+                <span className="lg-icon"><User size={14} /></span>
                 <input
                   id="email"
                   name="email"
                   type="text"
                   autoComplete="username"
                   required
-                  placeholder="Email or username"
+                  placeholder="you@example.com"
                   value={form.email}
                   onChange={onChange}
                   className="lg-input"
@@ -103,13 +92,10 @@ const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Password */}
-            <div className="lg-field f3">
+            <div className="lg-field">
               <label htmlFor="password" className="lg-label">Password</label>
               <div className="lg-wrap">
-                <span className="lg-icon">
-                  <Lock size={15} />
-                </span>
+                <span className="lg-icon"><Lock size={14} /></span>
                 <input
                   id="password"
                   name="password"
@@ -120,7 +106,6 @@ const LoginPage: React.FC = () => {
                   value={form.password}
                   onChange={onChange}
                   className="lg-input"
-                  style={{ paddingRight: '40px' }}
                 />
                 <button
                   type="button"
@@ -128,31 +113,28 @@ const LoginPage: React.FC = () => {
                   onClick={() => setShowPass(v => !v)}
                   aria-label={showPass ? 'Hide password' : 'Show password'}
                 >
-                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
 
-            {/* Forgot */}
-            <div className="lg-forgot-row f4">
-              <a href="#" className="lg-forgot">Forget Password?</a>
+            <div className="lg-forgot-row">
+              <a href="#" className="lg-forgot">Forgot password?</a>
             </div>
 
-            {/* Error */}
             {error && <p className="lg-error">{error}</p>}
 
-            {/* Submit */}
-            <button type="submit" disabled={loading} className="lg-btn f5">
+            <button type="submit" disabled={loading} className="lg-btn">
               {loading
-                ? <><span className="lg-spin" />Logging in…</>
-                : 'Login'
+                ? <><span className="lg-spin" />Signing in…</>
+                : 'Sign in'
               }
             </button>
 
           </form>
 
-          <p className="lg-support f6">
-            If having any issues please contact<br />
+          <p className="lg-support">
+            Having issues? Contact{' '}
             <a href="mailto:finguard12@gmail.com">finguard12@gmail.com</a>
           </p>
 

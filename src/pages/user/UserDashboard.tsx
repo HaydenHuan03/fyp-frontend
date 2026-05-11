@@ -472,9 +472,7 @@ const UserDashboard: React.FC = () => {
       <aside className={`ch-sidebar${sidebarOpen ? ' ch-sidebar--open' : ''}`} aria-label="Chat navigation">
         <div className="ch-sidebar-head">
           <div className="ch-brand">
-            <div className="ch-brand-icon" aria-hidden="true">
-              <Scale size={16} color="#fff" strokeWidth={2.2} />
-            </div>
+            <div className="ch-brand-mark" aria-hidden="true">F</div>
             <div>
               <div className="ch-brand-name">FinGuardMY</div>
               <div className="ch-brand-sub">Financial Crime AI</div>
@@ -579,9 +577,7 @@ const UserDashboard: React.FC = () => {
             <Menu size={18} />
           </button>
           <div className="ch-mobile-header-brand">
-            <div className="ch-brand-icon" aria-hidden="true">
-              <Scale size={14} color="#fff" strokeWidth={2.2} />
-            </div>
+            <div className="ch-brand-mark" aria-hidden="true">F</div>
             <span className="ch-mobile-brand-name">FinGuardMY</span>
           </div>
         </div>
@@ -612,9 +608,7 @@ const UserDashboard: React.FC = () => {
             {activeSession.messages.map(msg => (
               <div key={msg.id} className={`ch-msg-row ch-msg-${msg.role}`}>
                 {msg.role === 'assistant' && (
-                  <div className="ch-ai-avatar" aria-hidden="true">
-                    <Scale size={13} strokeWidth={2.2} />
-                  </div>
+                  <div className="ch-ai-avatar" aria-hidden="true">F</div>
                 )}
                 <div className={`ch-bubble ch-bubble-${msg.role}`}>
                   {msg.role === 'assistant' ? (

@@ -1,14 +1,15 @@
-import { CheckCircle, AlertCircle, Clock, Loader } from 'lucide-react';
+import { Loader } from 'lucide-react';
 import type { IngestStatus } from '../../lib/api';
 
-const CONFIG: Record<IngestStatus, { label: string; cls: string; icon: React.ReactNode }> = {
-  pending:   { label: 'Pending',    cls: 'kb-badge-pending',   icon: <Clock size={11} /> },
-  ingesting: { label: 'Ingesting…', cls: 'kb-badge-ingesting', icon: <Loader size={11} className="kb-spin" /> },
-  ingested:  { label: 'Ingested',   cls: 'kb-badge-ingested',  icon: <CheckCircle size={11} /> },
-  failed:    { label: 'Failed',     cls: 'kb-badge-failed',    icon: <AlertCircle size={11} /> },
-};
-
 export const IngestStatusBadge: React.FC<{ status: IngestStatus }> = ({ status }) => {
-  const { label, cls, icon } = CONFIG[status];
-  return <span className={`adm-badge ${cls}`}>{icon}{label}</span>;
+  if (status === 'ingested')  return <span className="pill pill--success pill--dot">Ingested</span>;
+  if (status === 'ingesting') return (
+    <span className="pill pill--accent pill--dot" style={{ gap: 6 }}>
+      <Loader size={10} style={{ animation: 'kb-rotate 1s linear infinite' }} />
+      Ingesting
+    </span>
+  );
+  if (status === 'pending')   return <span className="pill pill--warn pill--dot">Pending</span>;
+  if (status === 'failed')    return <span className="pill pill--danger pill--dot">Failed</span>;
+  return <span className="pill">{status}</span>;
 };
