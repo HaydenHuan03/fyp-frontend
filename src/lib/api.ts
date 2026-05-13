@@ -524,12 +524,14 @@ export async function apiUploadChatAttachment(
   token: string,
   conversationId: number,
   file: File,
+  signal?: AbortSignal,
 ): Promise<FileUploadResult> {
   const form = new FormData();
   form.append('file', file);
   const res = await authFetch(`${BASE_URL}/chat/conversations/${conversationId}/upload`, token, {
     method: 'POST',
     body: form,
+    signal,
   });
   return handleResponse<FileUploadResult>(res, 'Failed to process attachment');
 }

@@ -20,7 +20,19 @@ interface Message {
   content: string;
   sources?: string[];
   streaming?: boolean;
+  attachment?: { filename: string };
 }
+
+type AttachStatus = 'idle' | 'pending' | 'uploading' | 'ready' | 'error';
+
+interface AttachmentState {
+  status: AttachStatus;
+  file: File | null;
+  result: { filename: string; text: string } | null;
+  error?: string;
+}
+
+const ATTACH_IDLE: AttachmentState = { status: 'idle', file: null, result: null };
 
 interface Session {
   id: number;
@@ -57,9 +69,7 @@ const UserDashboard: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
+  const [attachment, setAttachment] = useState<AttachmentState>(ATTACH_IDLE);
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -72,6 +82,8 @@ const UserDashboard: React.FC = () => {
   const wsConvIdRef = useRef<number | null>(null);
   const currentAiMsgIdRef = useRef<string | null>(null);
   const sessionIdForWsRef = useRef<number | null>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
+  const uploadReqIdRef = useRef(0);
 
   const activeSession = sessions.find(s => s.id === activeId) ?? null;
 
@@ -292,23 +304,67 @@ const UserDashboard: React.FC = () => {
     navigate('/', { replace: true });
   };
 
+  const clearAttachment = useCallback(() => {
+    uploadAbortRef.current?.abort();
+    uploadAbortRef.current = null;
+    uploadReqIdRef.current += 1;
+    setAttachment(ATTACH_IDLE);
+  }, []);
+
+  const uploadAttachment = useCallback(async (file: File, conversationId: number) => {
+    if (!user) return;
+    uploadAbortRef.current?.abort();
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    const reqId = ++uploadReqIdRef.current;
+
+    setAttachment({ status: 'uploading', file, result: null });
+
+    try {
+      const result = await apiUploadChatAttachment(user.accessToken, conversationId, file, controller.signal);
+      if (reqId !== uploadReqIdRef.current) return;
+      setAttachment({
+        status: 'ready', file,
+        result: { filename: result.filename, text: result.text },
+      });
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return;
+      if (reqId !== uploadReqIdRef.current) return;
+      setAttachment({
+        status: 'error', file, result: null,
+        error: err instanceof Error ? err.message : 'Failed to process attachment. Please try again.',
+      });
+    }
+  }, [user]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    setUploadError('');
 
     const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase();
     const allowed = ['.pdf', '.txt', '.csv', '.md'];
     if (!allowed.includes(ext)) {
-      setUploadError(`Unsupported file type. Allowed: ${allowed.join(', ')}`);
+      setAttachment({
+        status: 'error', file, result: null,
+        error: `Unsupported file type. Allowed: ${allowed.join(', ')}`,
+      });
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setUploadError('File exceeds 10 MB limit.');
+      setAttachment({
+        status: 'error', file, result: null,
+        error: 'File exceeds 10 MB limit.',
+      });
       return;
     }
-    setAttachedFile(file);
+
+    // If we have a conversation, upload immediately. Otherwise defer to send.
+    if (activeId != null) {
+      uploadAttachment(file, activeId);
+    } else {
+      setAttachment({ status: 'pending', file, result: null });
+    }
   };
 
   // ── Stop generating ──
@@ -362,13 +418,12 @@ const UserDashboard: React.FC = () => {
   };
 
   const send = async (question: string) => {
-    if (!question.trim() || busy || uploading) return;
-    const currentFile = attachedFile;
-    setUploadError('');
+    if (!question.trim() || busy || attachment.status === 'uploading') return;
+    const currentAttachment = attachment;
+    const currentFile = currentAttachment.file;
     userScrolledRef.current = false;
     setBusy(true);
     setInput('');
-    setAttachedFile(null);
     setTimeout(() => {
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
     }, 0);
@@ -385,25 +440,35 @@ const UserDashboard: React.FC = () => {
         sessionId = conv.id;
       } catch (err) {
         setBusy(false);
-        setUploadError(err instanceof Error ? err.message : 'Failed to create conversation. Please try again.');
+        setAttachment({
+          status: 'error', file: currentFile, result: null,
+          error: err instanceof Error ? err.message : 'Failed to create conversation. Please try again.',
+        });
         return;
       }
     }
 
+    // Resolve file_context: use cached result if ready; upload now if pending.
     let fileContext: { filename: string; text: string } | null = null;
-    if (currentFile) {
-      setUploading(true);
+    if (currentAttachment.status === 'ready' && currentAttachment.result) {
+      fileContext = currentAttachment.result;
+    } else if (currentAttachment.status === 'pending' && currentFile && sessionId) {
+      setAttachment(a => ({ ...a, status: 'uploading' }));
       try {
-        const result = await apiUploadChatAttachment(user!.accessToken, sessionId!, currentFile);
+        const result = await apiUploadChatAttachment(user!.accessToken, sessionId, currentFile);
         fileContext = { filename: result.filename, text: result.text };
       } catch (err) {
-        setUploadError(err instanceof Error ? err.message : 'Failed to process attachment. Please try again.');
+        setAttachment({
+          status: 'error', file: currentFile, result: null,
+          error: err instanceof Error ? err.message : 'Failed to process attachment. Please try again.',
+        });
         setBusy(false);
-        setUploading(false);
         return;
       }
-      setUploading(false);
     }
+
+    // Attachment consumed — clear local state so next message starts fresh.
+    clearAttachment();
 
     const userMsgId = uid();
     const aiMsgId = uid();
@@ -415,7 +480,8 @@ const UserDashboard: React.FC = () => {
         {
           id: userMsgId,
           role: 'user' as const,
-          content: question + (currentFile ? ` [${currentFile.name}]` : ''),
+          content: question,
+          attachment: currentFile ? { filename: currentFile.name } : undefined,
         },
         { id: aiMsgId, role: 'assistant' as const, content: '', streaming: true },
       ],
@@ -618,7 +684,10 @@ const UserDashboard: React.FC = () => {
                       </ReactMarkdown>
                     </div>
                   ) : (() => {
-                    const { text, fileName } = parseFileFromContent(msg.content);
+                    // Prefer structured attachment field; fall back to legacy [filename] suffix in stored content.
+                    const parsed = msg.attachment ? null : parseFileFromContent(msg.content);
+                    const fileName = msg.attachment?.filename ?? parsed?.fileName ?? null;
+                    const text     = msg.attachment ? msg.content : (parsed?.text ?? msg.content);
                     return (
                       <>
                         {fileName && (
@@ -674,12 +743,12 @@ const UserDashboard: React.FC = () => {
 
         {/* Input */}
         <div className="ch-input-area">
-          {uploadError && (
+          {attachment.status === 'error' && attachment.error && (
             <div className="ch-file-chip" style={{ background: '#fef2f2', borderColor: '#fca5a5', color: '#dc2626' }}>
-              <span className="ch-file-chip-name">{uploadError}</span>
+              <span className="ch-file-chip-name">{attachment.error}</span>
               <button
                 className="ch-file-chip-remove"
-                onClick={() => setUploadError('')}
+                onClick={clearAttachment}
                 aria-label="Dismiss error"
                 style={{ color: '#dc2626' }}
               >
@@ -687,23 +756,25 @@ const UserDashboard: React.FC = () => {
               </button>
             </div>
           )}
-          {attachedFile && (
-            <div className={`ch-file-card${uploading ? ' ch-file-card--uploading' : ''}`}>
+          {attachment.file && attachment.status !== 'error' && (
+            <div className={`ch-file-card${attachment.status === 'uploading' ? ' ch-file-card--uploading' : ''}${attachment.status === 'ready' ? ' ch-file-card--ready' : ''}`}>
               <div className="ch-file-card-icon">
-                <FileText size={18} />
+                {attachment.status === 'ready' ? <Check size={18} /> : <FileText size={18} />}
               </div>
               <div className="ch-file-card-info">
-                <span className="ch-file-card-name">{attachedFile.name}</span>
+                <span className="ch-file-card-name">{attachment.file.name}</span>
                 <span className="ch-file-card-meta">
-                  {uploading ? 'Processing…' : (attachedFile.name.split('.').pop()?.toUpperCase() ?? 'FILE')}
+                  {attachment.status === 'uploading' && 'Processing…'}
+                  {attachment.status === 'pending'   && 'Will upload on send'}
+                  {attachment.status === 'ready'     && 'Ready'}
                 </span>
               </div>
-              {uploading ? (
+              {attachment.status === 'uploading' ? (
                 <Loader2 size={14} className="ch-file-card-spinner" />
               ) : (
                 <button
                   className="ch-file-card-remove"
-                  onClick={() => setAttachedFile(null)}
+                  onClick={clearAttachment}
                   aria-label="Remove attachment"
                 >
                   <X size={13} />
@@ -722,7 +793,7 @@ const UserDashboard: React.FC = () => {
             <button
               className="ch-attach-btn"
               onClick={() => fileInputRef.current?.click()}
-              disabled={busy || uploading}
+              disabled={busy || attachment.status === 'uploading'}
               aria-label="Attach file"
               title="Attach a case PDF to analyse"
             >
@@ -752,7 +823,8 @@ const UserDashboard: React.FC = () => {
               <button
                 className="ch-send-btn"
                 onClick={() => send(input)}
-                disabled={!input.trim() || uploading}
+                disabled={!input.trim() || attachment.status === 'uploading'}
+                title={attachment.status === 'uploading' ? 'Waiting for attachment to process…' : undefined}
                 aria-label="Send message"
               >
                 <Send size={15} strokeWidth={2.5} aria-hidden="true" />
