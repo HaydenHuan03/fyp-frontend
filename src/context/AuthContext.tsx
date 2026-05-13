@@ -98,10 +98,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // On mount: hydrate from storage. If the access token is still valid, render
-  // the app immediately and validate against Keycloak in the background — this
-  // prevents a blank page when the backend is slow (e.g. busy ingesting files).
-  // If the access token is expired, we must wait for the refresh before render.
   useEffect(() => {
     const stored = readStoredUser();
 

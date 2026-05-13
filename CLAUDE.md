@@ -18,16 +18,104 @@ npm run preview    # Preview production build locally
 **Tech stack:**
 - React 19 with TypeScript (strict mode)
 - Vite 8 + Oxc (build/HMR)
-- Tailwind CSS 4 (via `@tailwindcss/vite` plugin)
-- No routing library yet (single-page, only login implemented)
-- No global state management (local `useState` only)
+- Tailwind CSS 4 (via `@tailwindcss/vite` plugin) — imported but mostly unused; all styles are custom CSS
+- React Router DOM — `/` (login), `/admin/dashboard`, `/dashboard` (chat)
+- No global state management (local `useState` only); auth via `AuthContext`
 
 **Key structure:**
-- `src/pages/` — page-level components (currently only `LoginPage.tsx`)
-- `src/index.css` — global styles + all login page styles (`.lg-*` BEM classes, custom animations)
-- `src/App.css` — Vite template styles, currently unused
+```
+src/
+  pages/
+    LoginPage.tsx                  — login, .lg-* CSS namespace
+    admin/
+      AdminDashboard.tsx           — shell (.app grid + .adm-shell-body), topbar, section router
+      Overview.tsx                 — stat tiles + recent alerts + system health
+      UserManagement.tsx           — user table + role filter popover
+      KnowledgeBase.tsx            — file upload, staging, ingest, chunk preview
+      Documents.tsx                — documents grouped by uploader
+      Conversations.tsx            — conversation list + Drawer detail
+      Alerts.tsx                   — alert list with search/chip filters
+      CaseReports.tsx              — stub (backend gap)
+      BackgroundJobs.tsx           — stub (backend gap)
+      AuditLog.tsx                 — stub (backend gap)
+    user/
+      UserDashboard.tsx            — AI chat interface, .ch-* CSS namespace
+  components/admin/
+    AdminSidebar.tsx               — .side CSS classes, 3-group nav, health strip, user strip
+    Drawer.tsx                     — right-side 540px overlay, Esc/scrim-to-close
+    StatTile.tsx                   — stat card: label/value/delta/sparkline
+    Sparkline.tsx                  — SVG 64×22 sparkline with area fill
+    IngestStatusBadge.tsx          — .pill variant badges for ingest status
+    UserTable.tsx                  — .t table with .who/.avatar/.pill/.row-btn
+    UserModal.tsx                  — create/edit user modal (adm-modal classes)
+    ConfirmModal.tsx               — generic confirm modal (adm-modal classes)
+    ResetPasswordModal.tsx         — reset password modal (adm-modal classes)
+  index.css                        — ALL styles (~5200 lines); never create separate CSS files
+  App.css                          — unused Vite template styles
+```
 
-**Styling approach:** Hybrid — Tailwind CSS is imported but most styles are written as custom `.lg-*` BEM classes in `index.css`. New pages should follow the same pattern (custom CSS classes in `index.css` or a co-located CSS file, prefixed with a page-specific namespace).
+**Styling approach — token-based design system:**
+
+All styles live in `src/index.css`. Never create separate CSS files. When adding styles, **append a new override block at the end** of `index.css` rather than editing existing blocks — this avoids breaking old modal/login rules.
+
+**CSS namespace map:**
+| Namespace | Surface | Lines (approx) |
+|-----------|---------|----------------|
+| `.lg-*`   | Login page | ~31–370 + override block ~4173+ |
+| `.adm-*`  | Admin modals (old, keep as-is) | ~400–1580 |
+| `.ch-*`   | Chat (UserDashboard) | ~1588–3130 + override block ~4497+ |
+| `.app .side .top .page .stats .card .pill .drawer …` | Admin shell + all admin pages | ~3139+ |
+
+**Design tokens** — defined at `:root` (line ~3139), dark mode via `[data-theme="dark"]`:
+```css
+--bg            /* page background */
+--surface       /* card/panel background */
+--surface-2     /* subtle fill */
+--surface-3     /* active/selected fill */
+--line          /* primary border */
+--line-2        /* subtle border */
+--ink           /* primary text + button bg */
+--ink-2         /* secondary text */
+--ink-3         /* tertiary/placeholder text */
+--ink-4         /* faintest text */
+--accent        /* indigo #4f46e5 */
+--accent-deep   /* darker indigo */
+--accent-tint   /* pale indigo fill */
+--success / --success-tint
+--danger  / --danger-tint
+--warn    / --warn-tint
+--font-sans     /* display + UI font */
+--font-mono     /* monospace */
+--r             /* border-radius base (6px) */
+--r-2           /* larger radius (10px) */
+```
+
+**Shell layout** (both admin and chat use the same grid pattern):
+```css
+.app   { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+.ch-root { display: grid; grid-template-columns: 232px 1fr; height: 100dvh; }
+```
+
+**Key reusable CSS components:**
+- `.side` — sticky sidebar (232px, `height: 100dvh`, `border-right: 1px solid var(--line)`)
+- `.side__mark` — 22×22px black square brand mark, "F" in white, `border-radius: 5px`
+- `.top` — sticky topbar (`height: 52px`, `border-bottom: 1px solid var(--line)`)
+- `.page` — main content area (`padding: 32px 28px`, `max-width: none` when inside `.adm-shell-body`)
+- `.stats` — 4-column stat tile grid
+- `.card` — content card (`background: var(--surface); border: 1px solid var(--line)`)
+- `.pill` — status badge (variants: `pill--success`, `pill--danger`, `pill--warn`, `pill--accent`, `pill--dot`)
+- `.btn` — button base (variants: `btn--primary` ink bg, `btn--ghost` transparent, `btn--danger`, `btn--sm`)
+- `.t` — data table (`border-collapse: collapse`, `th`/`td` with `--line-2` borders)
+- `.drawer` — right-side 540px overlay panel with `.drawer__scrim`
+- `.toolbar` — flex row with search + filters, `gap: 8px`
+- `.chip` / `.filter` — filter chip buttons
+- `.popover` — dropdown panel (`position: absolute`, `z-index: 20`, shadow)
+
+**Active/selected state rule:** hover = `surface-2`, active/selected = `surface-3` + `ink` text + `font-weight: 550`. Never use accent color for nav active state.
+
+**Dark mode:** toggled by `document.documentElement.setAttribute('data-theme', 'dark')`, persisted to `localStorage` key `adm_theme`. All token-using components get dark mode automatically.
+
+**Modals:** legacy `adm-modal` + `adm-modal-*` classes — keep these exactly as-is. Do not migrate modal styles to the new token system.
 
 **API integration:**  Always refer to the directory ../fyp-backend/app/modules to understand the API structure. Based on the feature you are working on, refer to the corresponding module in the backend directory to understand the API structure.
 

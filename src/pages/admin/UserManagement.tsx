@@ -264,12 +264,19 @@ const UserManagement: React.FC = () => {
         />
       </div>
 
-      {modal.type === 'create' && (
-        <UserModal mode="create" onConfirm={handleCreate} onClose={closeModal} />
-      )}
-      {modal.type === 'edit' && (
-        <UserModal mode="edit" user={modal.user} onConfirm={handleEdit} onClose={closeModal} />
-      )}
+      <UserModal
+        open={modal.type === 'create'}
+        mode="create"
+        onConfirm={handleCreate}
+        onClose={closeModal}
+      />
+      <UserModal
+        open={modal.type === 'edit'}
+        mode="edit"
+        user={modal.type === 'edit' ? modal.user : undefined}
+        onConfirm={handleEdit}
+        onClose={closeModal}
+      />
       {modal.type === 'suspend' && (
         <ConfirmModal variant="suspend" userName={modal.user.full_name} onConfirm={handleSuspend} onClose={closeModal} />
       )}
