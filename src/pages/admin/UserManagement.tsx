@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Plus, Search, ShieldCheck, User, Check, ChevronDown, X } from 'lucide-react';
+import { Plus, Search, ShieldCheck, User, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   apiGetUsers, apiCreateUser, apiUpdateUser, apiDeleteUser,
@@ -30,22 +30,11 @@ const UserManagement: React.FC = () => {
   const [users, setUsers]   = useState<UserType[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
-  const [roles, setRoles]     = useState(() => new Set<string>());
+  const [role, setRole]       = useState<'all' | 'admin' | 'user'>('all');
   const [status, setStatus]   = useState<'all' | 'active' | 'suspended'>('all');
-  const [rolePopOpen, setRolePopOpen] = useState(false);
   const [modal, setModal]     = useState<ModalState>({ type: 'none' });
   const [toast, setToast]     = useState<Toast | null>(null);
   const toastTimer             = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const popRef                 = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!rolePopOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (popRef.current && !popRef.current.contains(e.target as Node)) setRolePopOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [rolePopOpen]);
 
   const showToast = useCallback((message: string, variant: 'success' | 'error') => {
     setToast({ message, variant });
@@ -63,17 +52,9 @@ const UserManagement: React.FC = () => {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-  const toggleRole = (id: string) => {
-    setRoles(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
   const filtered = useMemo(() => {
     let r = users;
-    if (roles.size > 0) r = r.filter(u => roles.has(u.role));
+    if (role !== 'all')          r = r.filter(u => u.role === role);
     if (status === 'active')    r = r.filter(u => u.is_active);
     if (status === 'suspended') r = r.filter(u => !u.is_active);
     if (search) {
@@ -81,26 +62,14 @@ const UserManagement: React.FC = () => {
       r = r.filter(u => u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
     }
     return r;
-  }, [users, roles, status, search]);
-
-  const roleCounts = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const u of users) m[u.role] = (m[u.role] || 0) + 1;
-    return m;
-  }, [users]);
+  }, [users, role, status, search]);
 
   const total     = users.length;
   const active    = users.filter(u => u.is_active).length;
   const suspended = users.filter(u => !u.is_active).length;
 
-  const hasFilters = roles.size > 0 || status !== 'all' || search.length > 0;
-  const clearAll   = () => { setRoles(new Set()); setStatus('all'); setSearch(''); };
-
-  const roleTriggerLabel = (() => {
-    if (roles.size === 0) return 'All roles';
-    if (roles.size === 1) return ROLE_DEFS.find(r => r.id === [...roles][0])?.label || [...roles][0];
-    return `${roles.size} roles`;
-  })();
+  const hasFilters = role !== 'all' || status !== 'all' || search.length > 0;
+  const clearAll   = () => { setRole('all'); setStatus('all'); setSearch(''); };
 
   const closeModal = () => setModal({ type: 'none' });
 
@@ -168,58 +137,17 @@ const UserManagement: React.FC = () => {
             />
           </div>
 
-          {/* Role filter popover */}
-          <div className="filter" ref={popRef}>
-            <button
-              className={`filter-trigger${roles.size ? ' is-on' : ''}${rolePopOpen ? ' is-open' : ''}`}
-              onClick={() => setRolePopOpen(v => !v)}
-              aria-expanded={rolePopOpen}
-            >
-              <ShieldCheck size={13} />
-              <span>{roleTriggerLabel}</span>
-              {roles.size > 0 && <span className="filter-trigger__count">{roles.size}</span>}
-              <ChevronDown size={12} />
-            </button>
-            {rolePopOpen && (
-              <div className="popover" role="dialog">
-                <div className="popover__head">
-                  <span>Filter by role</span>
-                  {roles.size > 0 && (
-                    <button className="link-btn" onClick={() => setRoles(new Set())}>Clear</button>
-                  )}
-                </div>
-                <ul className="role-list">
-                  {ROLE_DEFS.map(r => {
-                    const on = roles.has(r.id);
-                    return (
-                      <li key={r.id}>
-                        <button
-                          className={`role-row${on ? ' is-on' : ''}`}
-                          onClick={() => toggleRole(r.id)}
-                        >
-                          <span className={`check${on ? ' is-on' : ''}`}>
-                            {on && <Check size={11} strokeWidth={3} />}
-                          </span>
-                          <span className="role-row__icon"><r.Icon size={14} /></span>
-                          <span className="role-row__main">
-                            <span className="role-row__label">{r.label}</span>
-                            <span className="role-row__desc">{r.desc}</span>
-                          </span>
-                          <span className="role-row__count">{roleCounts[r.id] || 0}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-          </div>
+          <select className="toolbar-select" value={role} onChange={e => setRole(e.target.value as typeof role)} aria-label="Filter by role">
+            <option value="all">All roles</option>
+            <option value="admin">Admin</option>
+            <option value="user">Investigator</option>
+          </select>
 
-          <div className="chips">
-            <button className={`chip${status === 'all'       ? ' is-on' : ''}`} onClick={() => setStatus('all')}>Any status</button>
-            <button className={`chip${status === 'active'    ? ' is-on' : ''}`} onClick={() => setStatus('active')}>Active</button>
-            <button className={`chip${status === 'suspended' ? ' is-on' : ''}`} onClick={() => setStatus('suspended')}>Suspended</button>
-          </div>
+          <select className="toolbar-select" value={status} onChange={e => setStatus(e.target.value as typeof status)} aria-label="Filter by status">
+            <option value="all">Any status</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+          </select>
 
           <span className="toolbar__count">{filtered.length} of {total}</span>
         </div>
@@ -235,16 +163,16 @@ const UserManagement: React.FC = () => {
                 <button onClick={() => setSearch('')} aria-label="Clear search"><X size={11} /></button>
               </span>
             )}
-            {[...roles].map(id => {
-              const def = ROLE_DEFS.find(r => r.id === id);
+            {role !== 'all' && (() => {
+              const def = ROLE_DEFS.find(r => r.id === role);
               return (
-                <span key={id} className="tag">
+                <span className="tag">
                   {def && <def.Icon size={11} />}
-                  {def?.label || id}
-                  <button onClick={() => toggleRole(id)} aria-label={`Remove ${def?.label}`}><X size={11} /></button>
+                  {def?.label || role}
+                  <button onClick={() => setRole('all')} aria-label="Clear role"><X size={11} /></button>
                 </span>
               );
-            })}
+            })()}
             {status !== 'all' && (
               <span className="tag">
                 <span className={`dot ${status === 'active' ? 'dot--success' : 'dot--danger'}`} />

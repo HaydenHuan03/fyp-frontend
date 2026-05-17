@@ -139,6 +139,8 @@ All styles live in `src/index.css`. Never create separate CSS files. When adding
 
 # Design Thinking
 
+**ALWAYS refer to `DESIGN.md`** in the project root before designing or styling any UI element. `DESIGN.md` is the authoritative design reference for this project — use its color palette, typography scale, spacing system, radius tokens, and component patterns as the source of truth for all visual decisions.
+
 Before coding, understand the context and commit to a BOLD aesthetic direction:
 - **Purpose**: What problem does this interface solve? Who uses it?
 - **Tone**: Pick an extreme: brutally minimal, maximalist chaos, retro-futuristic, organic/natural, luxury/refined, playful/toy-like, editorial/magazine, brutalist/raw, art deco/geometric, soft/pastel, industrial/utilitarian, etc. There are so many flavors to choose from. Use these for inspiration but design one that is true to the aesthetic direction.
@@ -170,4 +172,6 @@ Interpret creatively and make unexpected choices that feel genuinely designed fo
 
 **IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
 
-Remember: Claude is capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
+**Always** confirm with on how the design should be look like, like what we going to build, which colour should we use, how the layout looks like, should it add in some simple animation.
+
+**Always** refer to the DESIGN.md

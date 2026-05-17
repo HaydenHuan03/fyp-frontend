@@ -46,6 +46,7 @@ const LoginPage: React.FC = () => {
         </div>
 
         <div className="lg-headline">
+          <p className="lg-eyebrow">Financial Intelligence Platform</p>
           <h1>Financial Crime<br />Analysis<br />Platform.</h1>
           <p>AI-powered tools for investigators — case reports, legal precedents, and document retrieval in one place.</p>
         </div>
@@ -71,6 +72,7 @@ const LoginPage: React.FC = () => {
         <div className="lg-form-box">
 
           <h2 className="lg-title">Sign in</h2>
+          <p className="lg-title-sub">Enter your credentials to continue</p>
 
           <form onSubmit={onSubmit}>
 

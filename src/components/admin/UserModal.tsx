@@ -18,6 +18,7 @@ interface FormState {
   email:      string;
   password:   string;
   role:       UserRoleType;
+  is_active:  boolean;
 }
 
 const FORM_ID = 'user-modal-form';
@@ -26,6 +27,7 @@ const UserModal: React.FC<Props> = ({ open, mode, user, onConfirm, onClose }) =>
   const [form, setForm] = useState<FormState>({
     username: '', first_name: user?.first_name ?? '', last_name: user?.last_name ?? '',
     email: user?.email ?? '', password: '', role: user?.role ?? 'user',
+    is_active: user?.is_active ?? true,
   });
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,7 @@ const UserModal: React.FC<Props> = ({ open, mode, user, onConfirm, onClose }) =>
 
   useEffect(() => {
     if (user) {
-      setForm({ username: '', first_name: user.first_name, last_name: user.last_name, email: user.email, password: '', role: user.role });
+      setForm({ username: '', first_name: user.first_name, last_name: user.last_name, email: user.email, password: '', role: user.role, is_active: user.is_active });
     }
   }, [user]);
 
@@ -42,7 +44,8 @@ const UserModal: React.FC<Props> = ({ open, mode, user, onConfirm, onClose }) =>
   }, [open]);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm(p => ({ ...p, [name]: name === 'is_active' ? value === 'true' : value }));
     setError('');
   };
 
@@ -58,7 +61,7 @@ const UserModal: React.FC<Props> = ({ open, mode, user, onConfirm, onClose }) =>
         } satisfies CreateUserPayload);
       } else {
         await onConfirm({
-          first_name: form.first_name, last_name: form.last_name, role: form.role,
+          first_name: form.first_name, last_name: form.last_name, role: form.role, is_active: form.is_active,
         } satisfies UpdateUserPayload);
       }
       onClose();
@@ -172,6 +175,18 @@ const UserModal: React.FC<Props> = ({ open, mode, user, onConfirm, onClose }) =>
             </select>
           </div>
         </div>
+
+        {mode === 'edit' && (
+          <div className="df-field">
+            <label htmlFor="df-is_active" className="df-label">Status</label>
+            <div className="df-select-wrap">
+              <select id="df-is_active" className="df-select" name="is_active" value={String(form.is_active)} onChange={onChange}>
+                <option value="true">Active</option>
+                <option value="false">Suspended</option>
+              </select>
+            </div>
+          </div>
+        )}
 
         {error && <div className="df-error" role="alert">{error}</div>}
       </form>

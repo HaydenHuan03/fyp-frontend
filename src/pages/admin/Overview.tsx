@@ -1,15 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiGetUsers, apiListDocuments, apiListAlerts } from '../../lib/api';
 import StatTile from '../../components/admin/StatTile';
 
-const HEALTH = [
-  { name: 'API Gateway',    value: '42 ms',  status: 'ok'   as const },
-  { name: 'RAG Retriever',  value: '118 ms', status: 'ok'   as const },
-  { name: 'Embedding Queue', value: '3 jobs', status: 'ok'  as const },
-  { name: 'Sanctions Sync', value: 'stale',  status: 'warn' as const },
-];
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
@@ -53,9 +46,7 @@ const Overview: React.FC = () => {
       <div className="page__head">
         <div>
           <h1 className="page__title">Good morning, {firstName}.</h1>
-          <div className="page__sub">A quick read on the platform — investigators, knowledge base, and any flags from the last 24 hours.</div>
         </div>
-        <button className="btn btn--ghost"><Download size={14} /> Export report</button>
       </div>
 
       <div className="stats">
@@ -100,24 +91,6 @@ const Overview: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* System health */}
-          <div className="gauge">
-            <div className="card__head">
-              <span className="card__title">System health</span>
-              <div className="right">
-                <span className="pill pill--success pill--dot">Operational</span>
-              </div>
-            </div>
-            {HEALTH.map(h => (
-              <div key={h.name} className="gauge__row">
-                <span className="name">{h.name}</span>
-                <span className={`gauge__bar ${h.status === 'warn' ? 'warn' : 'success'}`}>
-                  <span style={{ width: h.status === 'warn' ? '62%' : '92%' }} />
-                </span>
-                <span className="meta">{h.value}</span>
-              </div>
-            ))}
-          </div>
 
           {/* Top contributors */}
           <div className="gauge">

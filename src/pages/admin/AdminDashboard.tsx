@@ -9,23 +9,27 @@ import Documents from './Documents';
 import Conversations from './Conversations';
 import CaseReports from './CaseReports';
 import Alerts from './Alerts';
-import BackgroundJobs from './BackgroundJobs';
 import AuditLog from './AuditLog';
+import RagAnalytics from './RagAnalytics';
+import RagEvaluation from './RagEvaluation';
 import { apiListAlerts } from '../../lib/api';
 
 type Section =
   | 'overview' | 'users' | 'knowledge' | 'documents'
-  | 'conversations' | 'reports' | 'alerts' | 'jobs' | 'audit';
+  | 'conversations' | 'reports' | 'alerts' | 'audit'
+  | 'rag-analytics' | 'rag-evaluation';
 
 const SECTIONS: Section[] = [
   'overview', 'users', 'knowledge', 'documents',
-  'conversations', 'reports', 'alerts', 'jobs', 'audit',
+  'conversations', 'reports', 'alerts', 'audit',
+  'rag-analytics', 'rag-evaluation',
 ];
 
 const LABELS: Record<Section, string> = {
   overview: 'Overview', users: 'Users', knowledge: 'Knowledge base',
   documents: 'Documents', conversations: 'Conversations', reports: 'Case reports',
-  alerts: 'Alerts', jobs: 'Background jobs', audit: 'Audit log',
+  alerts: 'Alerts', audit: 'Audit log',
+  'rag-analytics': 'RAG Analytics', 'rag-evaluation': 'RAG Evaluation',
 };
 
 const SESSION_KEY = 'adm_section';
@@ -129,8 +133,9 @@ const AdminDashboard: React.FC = () => {
         {section === 'conversations' && <Conversations />}
         {section === 'reports'       && <CaseReports />}
         {section === 'alerts'        && <Alerts />}
-        {section === 'jobs'          && <BackgroundJobs />}
-        {section === 'audit'         && <AuditLog />}
+{section === 'audit'          && <AuditLog />}
+        {section === 'rag-analytics'  && <RagAnalytics />}
+        {section === 'rag-evaluation' && <RagEvaluation />}
       </div>
     </div>
   );

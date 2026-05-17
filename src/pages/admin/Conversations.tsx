@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Download, ChevronRight, ExternalLink, Trash2 } from 'lucide-react';
+import { Search, ChevronRight, ExternalLink, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { apiListConversations, type Conversation } from '../../lib/api';
+import { apiAdminListConversations, type ConversationAdmin } from '../../lib/api';
 import StatTile from '../../components/admin/StatTile';
 import Drawer from '../../components/admin/Drawer';
 import { formatDateTime } from '../../lib/utils';
@@ -10,15 +10,15 @@ type Scope = 'all' | 'case' | 'adhoc';
 
 const Conversations: React.FC = () => {
   const { user } = useAuth();
-  const [rows, setRows]       = useState<Conversation[]>([]);
+  const [rows, setRows]       = useState<ConversationAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [scope, setScope]     = useState<Scope>('all');
-  const [open, setOpen]       = useState<Conversation | null>(null);
+  const [open, setOpen]       = useState<ConversationAdmin | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
-    try { setRows(await apiListConversations(user.accessToken)); }
+    try { setRows(await apiAdminListConversations(user.accessToken)); }
     catch { /* silent */ }
     finally { setLoading(false); }
   }, [user]);
@@ -48,7 +48,6 @@ const Conversations: React.FC = () => {
           <h1 className="page__title">Conversations</h1>
           <div className="page__sub">Every chat session on the platform — case-linked or ad-hoc.</div>
         </div>
-        <button className="btn btn--ghost"><Download size={14} /> Export CSV</button>
       </div>
 
       <div className="stats">
@@ -145,6 +144,7 @@ const Conversations: React.FC = () => {
         {open && (
           <div className="kv">
             <div className="kv__row"><span className="kv__k">Conversation ID</span><span className="kv__v mono">{open.id}</span></div>
+            <div className="kv__row"><span className="kv__k">User ID</span><span className="kv__v mono">{open.user_id}</span></div>
             <div className="kv__row"><span className="kv__k">Case ID</span><span className="kv__v mono">{open.case_id || '—'}</span></div>
             <div className="kv__row"><span className="kv__k">Title</span><span className="kv__v">{open.title}</span></div>
             <div className="kv__row"><span className="kv__k">Created</span><span className="kv__v num">{formatDateTime(open.created_at)}</span></div>

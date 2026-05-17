@@ -44,10 +44,6 @@ interface Session {
 
 function uid() { return `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
 
-function shortSource(s: string) {
-  return s.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
-}
-
 function parseFileFromContent(content: string): { text: string; fileName: string | null } {
   const match = content.match(/^([\s\S]*?)\s*\[([^\]]+)\]$/);
   if (match) return { text: match[1], fileName: match[2] };
@@ -255,6 +251,7 @@ const UserDashboard: React.FC = () => {
             role: m.role as 'user' | 'assistant',
             content: m.content,
             sources: m.sources ?? undefined,
+            attachment: m.attachment_filename ? { filename: m.attachment_filename } : undefined,
           })),
         }));
       } catch { /* leave messages empty */ }
@@ -714,16 +711,6 @@ const UserDashboard: React.FC = () => {
                   )}
                   {msg.streaming && msg.content && (
                     <span className="ch-cursor" aria-hidden="true" />
-                  )}
-                  {msg.sources && msg.sources.length > 0 && (
-                    <div className="ch-sources">
-                      <span className="ch-sources-label">Sources</span>
-                      {msg.sources.map((src, i) => (
-                        <span key={i} className="ch-source-chip" title={src}>
-                          {shortSource(src)}
-                        </span>
-                      ))}
-                    </div>
                   )}
                 </div>
               </div>

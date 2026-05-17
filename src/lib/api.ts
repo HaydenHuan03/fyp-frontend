@@ -224,7 +224,12 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   sources: string[] | null;
+  attachment_filename: string | null;
   created_at: string;
+}
+
+export interface ConversationAdmin extends Conversation {
+  user_id: string;
 }
 
 export async function apiListConversations(token: string): Promise<Conversation[]> {
@@ -232,6 +237,13 @@ export async function apiListConversations(token: string): Promise<Conversation[
     headers: authHeaders(token),
   });
   return handleResponse<Conversation[]>(res, 'Failed to fetch conversations');
+}
+
+export async function apiAdminListConversations(token: string): Promise<ConversationAdmin[]> {
+  const res = await authFetch(`${BASE_URL}/chat/admin/conversations`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<ConversationAdmin[]>(res, 'Failed to fetch conversations');
 }
 
 export async function apiCreateConversation(token: string, title: string): Promise<Conversation> {
@@ -517,6 +529,182 @@ export async function apiDeleteAlert(token: string, id: number): Promise<void> {
     headers: authHeaders(token),
   });
   return handleDeleteResponse(res, 'Failed to delete alert');
+}
+
+// ── RAG Analytics ────────────────────────────────────────────────────────────
+
+export interface RetrievalFrequencyItem {
+  filename: string;
+  retrieval_count: number;
+}
+
+export interface QuerySummary {
+  total_queries: number;
+  insufficient_info_count: number;
+  insufficient_info_rate: number;
+}
+
+export interface LatencyStats {
+  p50_ms: number | null;
+  p95_ms: number | null;
+  avg_ms: number | null;
+}
+
+export interface TokenStats {
+  avg_prompt_tokens: number | null;
+  avg_completion_tokens: number | null;
+  total_tokens: number | null;
+}
+
+export interface IntentStat {
+  intent: string;
+  count: number;
+  percentage: number;
+}
+
+export type AnalyticsPeriod = 'today' | 'week' | 'month';
+
+export async function apiGetRetrievalFrequency(token: string): Promise<RetrievalFrequencyItem[]> {
+  const res = await authFetch(`${BASE_URL}/rag/analytics/documents/retrieval-frequency`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<RetrievalFrequencyItem[]>(res, 'Failed to fetch retrieval frequency');
+}
+
+export async function apiGetQuerySummary(token: string, period: AnalyticsPeriod = 'week'): Promise<QuerySummary> {
+  const res = await authFetch(`${BASE_URL}/rag/analytics/queries/summary?period=${period}`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<QuerySummary>(res, 'Failed to fetch query summary');
+}
+
+export async function apiGetLatencyStats(token: string): Promise<LatencyStats> {
+  const res = await authFetch(`${BASE_URL}/rag/analytics/queries/latency`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<LatencyStats>(res, 'Failed to fetch latency stats');
+}
+
+export async function apiGetTokenStats(token: string): Promise<TokenStats> {
+  const res = await authFetch(`${BASE_URL}/rag/analytics/queries/tokens`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<TokenStats>(res, 'Failed to fetch token stats');
+}
+
+export async function apiGetIntentStats(token: string): Promise<IntentStat[]> {
+  const res = await authFetch(`${BASE_URL}/rag/analytics/queries/intents`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<IntentStat[]>(res, 'Failed to fetch intent stats');
+}
+
+// ── RAG Evaluation ────────────────────────────────────────────────────────────
+
+export interface DatasetEntryCreate {
+  question: string;
+  ground_truth: string;
+}
+
+export interface DatasetEntryOut {
+  id: number;
+  question: string;
+  ground_truth: string;
+  source: string;
+  created_at: string;
+}
+
+export interface EvalRunOut {
+  id: number;
+  triggered_by: string;
+  status: string;
+  faithfulness: number | null;
+  answer_relevancy: number | null;
+  context_precision: number | null;
+  context_recall: number | null;
+  answer_correctness: number | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface EvalRunDetail extends EvalRunOut {
+  results: unknown[] | null;
+  error: string | null;
+}
+
+export interface EvalScheduleOut {
+  cron: string;
+  is_active: boolean;
+}
+
+export async function apiListEvalDataset(token: string): Promise<DatasetEntryOut[]> {
+  const res = await authFetch(`${BASE_URL}/rag/evaluation/dataset`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<DatasetEntryOut[]>(res, 'Failed to fetch evaluation dataset');
+}
+
+export async function apiAddEvalEntry(token: string, data: DatasetEntryCreate): Promise<DatasetEntryOut> {
+  const res = await authFetch(`${BASE_URL}/rag/evaluation/dataset`, token, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(data),
+  });
+  return handleResponse<DatasetEntryOut>(res, 'Failed to add dataset entry');
+}
+
+export async function apiDeleteEvalEntry(token: string, id: number): Promise<void> {
+  const res = await authFetch(`${BASE_URL}/rag/evaluation/dataset/${id}`, token, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  return handleDeleteResponse(res, 'Failed to delete dataset entry');
+}
+
+export async function apiSeedEvalDataset(token: string): Promise<{ seeded: number }> {
+  const res = await authFetch(`${BASE_URL}/rag/evaluation/dataset/seed`, token, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  return handleResponse<{ seeded: number }>(res, 'Failed to seed dataset');
+}
+
+export async function apiTriggerEvalRun(token: string): Promise<EvalRunOut> {
+  const res = await authFetch(`${BASE_URL}/rag/evaluation/run`, token, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  return handleResponse<EvalRunOut>(res, 'Failed to trigger evaluation run');
+}
+
+export async function apiListEvalRuns(token: string): Promise<EvalRunOut[]> {
+  const res = await authFetch(`${BASE_URL}/rag/evaluation/runs`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<EvalRunOut[]>(res, 'Failed to fetch evaluation runs');
+}
+
+export async function apiGetEvalRun(token: string, runId: number): Promise<EvalRunDetail> {
+  const res = await authFetch(`${BASE_URL}/rag/evaluation/runs/${runId}`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<EvalRunDetail>(res, 'Failed to fetch evaluation run');
+}
+
+export async function apiGetEvalSchedule(token: string): Promise<EvalScheduleOut> {
+  const res = await authFetch(`${BASE_URL}/rag/evaluation/schedule`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<EvalScheduleOut>(res, 'Failed to fetch evaluation schedule');
+}
+
+export async function apiUpdateEvalSchedule(token: string, cron: string): Promise<EvalScheduleOut> {
+  const res = await authFetch(`${BASE_URL}/rag/evaluation/schedule`, token, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ cron }),
+  });
+  return handleResponse<EvalScheduleOut>(res, 'Failed to update evaluation schedule');
 }
 
 /** Upload a file to a chat conversation and extract its text for prompt injection. */

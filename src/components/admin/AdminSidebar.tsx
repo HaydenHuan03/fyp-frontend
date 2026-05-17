@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, BookOpen, FileText,
-  MessageSquare, FileCheck2, ShieldAlert,
-  Activity, History, LogOut,
+  Gauge, Users, Library, Files,
+  MessagesSquare, ClipboardList, TriangleAlert,
+  ScrollText, LogOut, ChartLine, Microscope,
 } from 'lucide-react';
 
 type Section =
   | 'overview' | 'users' | 'knowledge' | 'documents'
   | 'conversations' | 'reports' | 'alerts'
-  | 'jobs' | 'audit';
+  | 'audit'
+  | 'rag-analytics' | 'rag-evaluation';
 
 interface Props {
   activeSection: Section;
@@ -31,25 +32,31 @@ const GROUPS = [
   {
     label: 'Workspace',
     items: [
-      { id: 'overview'  as Section, label: 'Overview',       Icon: LayoutDashboard },
-      { id: 'users'     as Section, label: 'Users',          Icon: Users },
-      { id: 'knowledge' as Section, label: 'Knowledge base', Icon: BookOpen },
-      { id: 'documents' as Section, label: 'Documents',      Icon: FileText },
+      { id: 'overview'  as Section, label: 'Overview',       Icon: Gauge   },
+      { id: 'users'     as Section, label: 'Users',          Icon: Users   },
+      { id: 'knowledge' as Section, label: 'Knowledge base', Icon: Library },
+      { id: 'documents' as Section, label: 'Documents',      Icon: Files   },
     ],
   },
   {
     label: 'Activity',
     items: [
-      { id: 'conversations' as Section, label: 'Conversations', Icon: MessageSquare },
-      { id: 'reports'       as Section, label: 'Case reports',  Icon: FileCheck2 },
-      { id: 'alerts'        as Section, label: 'Alerts',        Icon: ShieldAlert, badge: true },
+      { id: 'conversations' as Section, label: 'Conversations', Icon: MessagesSquare,  },
+      { id: 'reports'       as Section, label: 'Case reports',  Icon: ClipboardList,   },
+      { id: 'alerts'        as Section, label: 'Alerts',        Icon: TriangleAlert, badge: true },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { id: 'rag-analytics'  as Section, label: 'RAG Analytics',  Icon: ChartLine  },
+      { id: 'rag-evaluation' as Section, label: 'RAG Evaluation', Icon: Microscope },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { id: 'jobs'  as Section, label: 'Background jobs', Icon: Activity },
-      { id: 'audit' as Section, label: 'Audit log',       Icon: History },
+      { id: 'audit' as Section, label: 'Audit log', Icon: ScrollText },
     ],
   },
 ];
@@ -107,11 +114,6 @@ const AdminSidebar: React.FC<Props> = ({
         ))}
 
         <div className="side__spacer" />
-
-        <div className="side__health">
-          <span className="dot" />
-          <span>All systems operational</span>
-        </div>
 
         <div className="side__user">
           <div className="avatar">{initials}</div>
