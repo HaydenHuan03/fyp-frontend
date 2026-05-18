@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Loader, X, RefreshCw, Eye, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import {
-  apiListDocuments, apiUploadDocuments, apiIngestDocuments,
+  apiListDocuments, apiUploadDocuments,
+  apiReingestDocuments,
   apiDeleteDocument, apiListDocumentChunks,
   type DocumentListItem, type IngestStatus, type ChunkPreviewItem,
 } from '../../lib/api';
@@ -96,10 +97,9 @@ const KnowledgeBase: React.FC = () => {
   const handleReIngest = async (id: number, filename: string) => {
     setReIngestingId(id);
     try {
-      const results = await apiIngestDocuments(user!.accessToken, [id]);
-      const r = results[0];
-      if (!r?.error) toast(`"${filename}" re-ingestion started.`, 'success');
-      else toast(`"${filename}": ${r.error}`, 'error');
+      const result = await apiReingestDocuments(user!.accessToken, [filename]);
+      if (result.missing.length > 0) toast(`"${filename}" not found on storage.`, 'error');
+      else toast(result.message, 'success');
       await load();
     } catch (e) { toast(e instanceof Error ? e.message : 'Re-ingestion failed', 'error'); }
     finally { setReIngestingId(null); }
@@ -269,7 +269,7 @@ const KnowledgeBase: React.FC = () => {
                         {doc.ingest_status === 'ingested' && doc.chunk_count > 0 && (
                           <button className="row-btn" title="Preview chunks" onClick={() => handleViewChunks(doc)}><Eye size={13} /></button>
                         )}
-                        {doc.ingest_status === 'failed' && (
+                        {doc.ingest_status !== 'ingesting' && (
                           <button className="row-btn" title="Re-ingest" disabled={reIngestingId === doc.id} onClick={() => handleReIngest(doc.id, doc.filename)}>
                             {reIngestingId === doc.id ? <Loader size={13} className="kb-spin" /> : <RefreshCw size={13} />}
                           </button>

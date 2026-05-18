@@ -377,6 +377,22 @@ export async function apiIngestDocuments(token: string, ids: number[]): Promise<
   return handleResponse<IngestResult[]>(res, 'Failed to ingest documents');
 }
 
+export interface ReingestResult {
+  accepted_ids: number[];
+  pulled_from_r2: string[];
+  missing: string[];
+  message: string;
+}
+
+export async function apiReingestDocuments(token: string, filenames: string[]): Promise<ReingestResult> {
+  const res = await authFetch(`${BASE_URL}/rag/documents/reingest`, token, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ filenames }),
+  });
+  return handleResponse<ReingestResult>(res, 'Failed to re-ingest documents');
+}
+
 export async function apiListDocumentChunks(
   token: string,
   documentId: number,
