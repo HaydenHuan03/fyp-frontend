@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Play, Trash2, Plus, DatabaseZap, CalendarClock, ChevronRight, X, Save } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import {
   apiListEvalDataset, apiAddEvalEntry, apiDeleteEvalEntry, apiSeedEvalDataset,
   apiTriggerEvalRun, apiListEvalRuns, apiGetEvalRun, apiGetEvalSchedule, apiUpdateEvalSchedule,

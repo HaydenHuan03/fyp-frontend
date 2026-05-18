@@ -1,17 +1,13 @@
 import { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { useNavigate } from 'react-router-dom';
 import {
   Gauge, Users, Library, Files,
   MessagesSquare, ClipboardList, TriangleAlert,
   ScrollText, LogOut, ChartLine, Microscope,
 } from 'lucide-react';
-
-type Section =
-  | 'overview' | 'users' | 'knowledge' | 'documents'
-  | 'conversations' | 'reports' | 'alerts'
-  | 'audit'
-  | 'rag-analytics' | 'rag-evaluation';
+import { type Section } from '../../types/admin';
+import { getInitials } from '../../lib/utils';
 
 interface Props {
   activeSection: Section;
@@ -21,12 +17,6 @@ interface Props {
   onMobileClose?: () => void;
 }
 
-function getInitials(email: string): string {
-  const local = email.split('@')[0];
-  const parts = local.split(/[._-]/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return local.slice(0, 2).toUpperCase();
-}
 
 const GROUPS = [
   {

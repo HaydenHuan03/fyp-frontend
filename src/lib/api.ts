@@ -169,11 +169,25 @@ async function handleDeleteResponse(res: Response, fallbackMessage: string): Pro
   }
 }
 
-export async function apiGetUsers(token: string): Promise<User[]> {
-  const res = await authFetch(`${BASE_URL}/users/`, token, {
+export interface PaginatedUsersResponse {
+  items: User[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export async function apiGetUsers(
+  token: string,
+  params: { page?: number; page_size?: number } = {},
+): Promise<PaginatedUsersResponse> {
+  const q = new URLSearchParams();
+  if (params.page)      q.set('page',      String(params.page));
+  if (params.page_size) q.set('page_size', String(params.page_size));
+  const res = await authFetch(`${BASE_URL}/users/?${q}`, token, {
     headers: authHeaders(token),
   });
-  return handleResponse<User[]>(res, 'Failed to fetch users');
+  return handleResponse<PaginatedUsersResponse>(res, 'Failed to fetch users');
 }
 
 export async function apiCreateUser(
@@ -239,11 +253,26 @@ export async function apiListConversations(token: string): Promise<Conversation[
   return handleResponse<Conversation[]>(res, 'Failed to fetch conversations');
 }
 
-export async function apiAdminListConversations(token: string): Promise<ConversationAdmin[]> {
-  const res = await authFetch(`${BASE_URL}/chat/admin/conversations`, token, {
+export interface PaginatedConversationsResponse {
+  items: ConversationAdmin[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export async function apiAdminListConversations(
+  token: string,
+  params: { page?: number; page_size?: number; user_id?: string } = {},
+): Promise<PaginatedConversationsResponse> {
+  const q = new URLSearchParams();
+  if (params.page)      q.set('page',      String(params.page));
+  if (params.page_size) q.set('page_size', String(params.page_size));
+  if (params.user_id)   q.set('user_id',   params.user_id);
+  const res = await authFetch(`${BASE_URL}/chat/admin/conversations?${q}`, token, {
     headers: authHeaders(token),
   });
-  return handleResponse<ConversationAdmin[]>(res, 'Failed to fetch conversations');
+  return handleResponse<PaginatedConversationsResponse>(res, 'Failed to fetch conversations');
 }
 
 export async function apiCreateConversation(token: string, title: string): Promise<Conversation> {

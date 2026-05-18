@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, ChevronRight, ExternalLink, Trash2 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { apiAdminListConversations, type ConversationAdmin } from '../../lib/api';
+import { useAuth } from '../../context/useAuth';
+import { apiAdminListConversations, type ConversationAdmin, type PaginatedConversationsResponse } from '../../lib/api';
 import StatTile from '../../components/admin/StatTile';
 import Drawer from '../../components/admin/Drawer';
 import { formatDateTime } from '../../lib/utils';
@@ -11,17 +11,23 @@ type Scope = 'all' | 'case' | 'adhoc';
 const Conversations: React.FC = () => {
   const { user } = useAuth();
   const [rows, setRows]       = useState<ConversationAdmin[]>([]);
+  const [meta, setMeta]       = useState<Omit<PaginatedConversationsResponse, 'items'>>({ total: 0, page: 1, page_size: 20, pages: 1 });
+  const [page, setPage]       = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [scope, setScope]     = useState<Scope>('all');
   const [open, setOpen]       = useState<ConversationAdmin | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (p = page) => {
     if (!user) return;
-    try { setRows(await apiAdminListConversations(user.accessToken)); }
+    try {
+      const data = await apiAdminListConversations(user.accessToken, { page: p, page_size: 20 });
+      setRows(data.items);
+      setMeta({ total: data.total, page: data.page, page_size: data.page_size, pages: data.pages });
+    }
     catch { /* silent */ }
     finally { setLoading(false); }
-  }, [user]);
+  }, [user, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -40,6 +46,7 @@ const Conversations: React.FC = () => {
   }, [rows, scope, search]);
 
   const caseLinked = rows.filter(c => c.case_id).length;
+  const totalCount = meta.total;
 
   return (
     <div className="page">
@@ -51,9 +58,9 @@ const Conversations: React.FC = () => {
       </div>
 
       <div className="stats">
-        <StatTile label="Conversations" value={loading ? '—' : rows.length}  delta="+0" dir="flat" period="total"       spark={[8,9,11,10,13,15,14,17,19,21,rows.length||0]} />
-        <StatTile label="Case-linked"   value={loading ? '—' : caseLinked}   delta="—"  dir="flat" period="of all"      spark={[5,6,7,7,8,8,9,9,10,10,caseLinked||0]} />
-        <StatTile label="Ad-hoc"        value={loading ? '—' : rows.length - caseLinked} delta="—" dir="flat" period="of all" spark={[3,4,4,3,5,6,5,8,9,11,rows.length-caseLinked||0]} />
+        <StatTile label="Conversations" value={loading ? '—' : totalCount}  delta="+0" dir="flat" period="total"       spark={[8,9,11,10,13,15,14,17,19,21,totalCount||0]} />
+        <StatTile label="Case-linked"   value={loading ? '—' : caseLinked}   delta="—"  dir="flat" period="of page"      spark={[5,6,7,7,8,8,9,9,10,10,caseLinked||0]} />
+        <StatTile label="Ad-hoc"        value={loading ? '—' : rows.length - caseLinked} delta="—" dir="flat" period="of page" spark={[3,4,4,3,5,6,5,8,9,11,rows.length-caseLinked||0]} />
       </div>
 
       <div className="card">
@@ -71,7 +78,7 @@ const Conversations: React.FC = () => {
             <button className={`chip${scope === 'case'  ? ' is-on' : ''}`} onClick={() => setScope('case')}>Case-linked</button>
             <button className={`chip${scope === 'adhoc' ? ' is-on' : ''}`} onClick={() => setScope('adhoc')}>Ad-hoc</button>
           </div>
-          <span className="toolbar__count">{filtered.length} of {rows.length}</span>
+          <span className="toolbar__count">{filtered.length} of {totalCount}</span>
         </div>
 
         <div className="table-wrap">
@@ -127,6 +134,22 @@ const Conversations: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {meta.pages > 1 && (
+          <div className="pagination">
+            <button
+              className="btn btn--ghost btn--sm"
+              disabled={page <= 1}
+              onClick={() => { setPage(p => p - 1); load(page - 1); }}
+            >Previous</button>
+            <span className="pagination__info">Page {meta.page} of {meta.pages}</span>
+            <button
+              className="btn btn--ghost btn--sm"
+              disabled={page >= meta.pages}
+              onClick={() => { setPage(p => p + 1); load(page + 1); }}
+            >Next</button>
+          </div>
+        )}
       </div>
 
       <Drawer

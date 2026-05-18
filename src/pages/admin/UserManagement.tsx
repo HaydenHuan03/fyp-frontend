@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Plus, Search, ShieldCheck, User, X } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import {
   apiGetUsers, apiCreateUser, apiUpdateUser, apiDeleteUser,
   type User as UserType, type CreateUserPayload, type UpdateUserPayload,
+  type PaginatedUsersResponse,
 } from '../../lib/api';
 import UserTable from '../../components/admin/UserTable';
 import UserModal from '../../components/admin/UserModal';
@@ -27,7 +28,9 @@ const ROLE_DEFS = [
 
 const UserManagement: React.FC = () => {
   const { user: authUser } = useAuth();
-  const [users, setUsers]   = useState<UserType[]>([]);
+  const [users, setUsers]     = useState<UserType[]>([]);
+  const [meta, setMeta]       = useState<Omit<PaginatedUsersResponse, 'items'>>({ total: 0, page: 1, page_size: 20, pages: 1 });
+  const [page, setPage]       = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [role, setRole]       = useState<'all' | 'admin' | 'user'>('all');
@@ -42,13 +45,17 @@ const UserManagement: React.FC = () => {
     toastTimer.current = setTimeout(() => setToast(null), 3500);
   }, []);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (p = page) => {
     if (!authUser) return;
     setLoading(true);
-    try { setUsers(await apiGetUsers(authUser.accessToken)); }
+    try {
+      const data = await apiGetUsers(authUser.accessToken, { page: p, page_size: 20 });
+      setUsers(data.items);
+      setMeta({ total: data.total, page: data.page, page_size: data.page_size, pages: data.pages });
+    }
     catch (err) { showToast(err instanceof Error ? err.message : 'Failed to load users', 'error'); }
     finally { setLoading(false); }
-  }, [authUser, showToast]);
+  }, [authUser, showToast, page]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -64,7 +71,7 @@ const UserManagement: React.FC = () => {
     return r;
   }, [users, role, status, search]);
 
-  const total     = users.length;
+  const total     = meta.total;
   const active    = users.filter(u => u.is_active).length;
   const suspended = users.filter(u => !u.is_active).length;
 
@@ -190,6 +197,22 @@ const UserManagement: React.FC = () => {
           onEdit={user => setModal({ type: 'edit', user })}
           onDelete={user => setModal({ type: 'delete', user })}
         />
+
+        {meta.pages > 1 && (
+          <div className="pagination">
+            <button
+              className="btn btn--ghost btn--sm"
+              disabled={page <= 1}
+              onClick={() => { setPage(p => p - 1); fetchUsers(page - 1); }}
+            >Previous</button>
+            <span className="pagination__info">Page {meta.page} of {meta.pages}</span>
+            <button
+              className="btn btn--ghost btn--sm"
+              disabled={page >= meta.pages}
+              onClick={() => { setPage(p => p + 1); fetchUsers(page + 1); }}
+            >Next</button>
+          </div>
+        )}
       </div>
 
       <UserModal

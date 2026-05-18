@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { apiGetUsers, apiListDocuments, apiListAlerts } from '../../lib/api';
 import StatTile from '../../components/admin/StatTile';
 
@@ -27,7 +27,7 @@ const Overview: React.FC = () => {
         apiListAlerts(user.accessToken),
       ]);
       setStats({
-        investigators: users.filter(u => u.role === 'user').length,
+        investigators: users.items.filter(u => u.role === 'user').length,
         documents: docs.length,
         ingested: docs.filter(d => d.ingest_status === 'ingested').length,
         alerts: alerts.length,

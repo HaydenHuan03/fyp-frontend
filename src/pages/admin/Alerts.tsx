@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ShieldAlert, Search, Loader, Settings2, Eye, X as XIcon } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { apiListAlerts, apiDeleteAlert, type AlertItem } from '../../lib/api';
 import { useToast } from '../../hooks/useToast';
 import { formatDateTime } from '../../lib/utils';

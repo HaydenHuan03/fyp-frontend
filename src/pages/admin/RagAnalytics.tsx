@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Zap, MessageSquare, Clock, Banknote } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import {
   apiGetQuerySummary, apiGetLatencyStats, apiGetTokenStats,
   apiGetRetrievalFrequency, apiGetIntentStats,

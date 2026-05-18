@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FileText, ExternalLink } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { apiListDocuments, type DocumentListItem } from '../../lib/api';
 import { formatDate } from '../../lib/utils';
 import { IngestStatusBadge } from '../../components/admin/IngestStatusBadge';

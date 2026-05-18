@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useState, useEffect, useRef } from 'react';
 import { Lock } from 'lucide-react';
 import { apiRefreshToken, registerAuthBridge, roleFromToken } from '../lib/api';
 
@@ -11,7 +11,7 @@ export interface AuthUser {
   refreshToken: string;
 }
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: AuthUser | null;
   isInitializing: boolean;
   login: (user: AuthUser) => void;
@@ -20,7 +20,7 @@ interface AuthContextValue {
   getValidAccessToken: () => Promise<string>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 const STORAGE_KEY = 'finguard_auth';
 
@@ -55,10 +55,16 @@ function clearUser() {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const stored = readStoredUser();
+    return stored && !isTokenExpired(stored.accessToken) ? stored : null;
+  });
+  const [isInitializing, setIsInitializing] = useState<boolean>(() => {
+    const stored = readStoredUser();
+    return stored !== null && isTokenExpired(stored.accessToken);
+  });
   const [sessionExpired, setSessionExpired] = useState(false);
-  const userRef = useRef<AuthUser | null>(null);
+  const userRef = useRef<AuthUser | null>(user);
 
   /** Persist and broadcast a new auth user. */
   const applyUser = (u: AuthUser) => {
@@ -100,41 +106,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const stored = readStoredUser();
+    if (!stored) return;
 
-    if (!stored) {
-      setIsInitializing(false);
-      return;
-    }
-
-    const accessValid = !isTokenExpired(stored.accessToken);
-
-    if (accessValid) {
-      applyUser(stored);
-      setIsInitializing(false);
-      // Fire-and-forget background revalidation.
+    if (!isTokenExpired(stored.accessToken)) {
+      // Token already valid — state initialised from localStorage above.
+      // Fire background refresh to rotate tokens silently.
       tryRefresh(stored)
         .then(refreshed => applyUser(refreshed))
         .catch(() => {
-          // Only force logout if the refresh token itself is clearly dead.
           if (isTokenExpired(stored.refreshToken)) {
             clearUser();
             setUser(null);
             userRef.current = null;
           }
-        });
+        })
+        .finally(() => setIsInitializing(false));
       return;
     }
 
-    (async () => {
-      try {
-        const refreshed = await tryRefresh(stored);
-        applyUser(refreshed);
-      } catch {
-        clearUser();
-      }
-      setIsInitializing(false);
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Access token expired — must refresh before allowing navigation.
+    tryRefresh(stored)
+      .then(refreshed => applyUser(refreshed))
+      .catch(() => clearUser())
+      .finally(() => setIsInitializing(false));
   }, []);
 
   // Register the fetch interceptor bridge so api.ts can transparently refresh
@@ -150,7 +144,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       onUnauthorized: () => setSessionExpired(true),
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fallback for non-fetch code paths (e.g. WebSocket auth failures) that
@@ -168,7 +161,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     window.addEventListener('finguard:unauthorized', handler);
     return () => window.removeEventListener('finguard:unauthorized', handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRelogin = () => {
@@ -208,8 +200,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
-  return ctx;
-}

@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useAuth } from '../../context/AuthContext';
-import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip, Menu, Square, RefreshCw, Pencil, Check, FileText, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/useAuth';
+import { Scale, Plus, MessageSquare, X, LogOut, Send, Paperclip, Menu, Square, RefreshCw, Pencil, Check, FileText, Loader2, Copy } from 'lucide-react';
 import {
   apiListConversations,
   apiCreateConversation,
@@ -68,6 +68,7 @@ const UserDashboard: React.FC = () => {
   const [attachment, setAttachment] = useState<AttachmentState>(ATTACH_IDLE);
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const userScrolledRef = useRef(false);
@@ -293,6 +294,13 @@ const UserDashboard: React.FC = () => {
       setSessions(prev => prev.map(s => s.id !== id ? s : { ...s, title: trimmed }));
     } catch { /* ignore */ }
     setRenamingId(null);
+  };
+
+  const copyMessage = (id: string, content: string) => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(() => {});
   };
 
   const handleLogout = () => {
@@ -673,14 +681,41 @@ const UserDashboard: React.FC = () => {
                 {msg.role === 'assistant' && (
                   <div className="ch-ai-avatar" aria-hidden="true">F</div>
                 )}
-                <div className={`ch-bubble ch-bubble-${msg.role}`}>
-                  {msg.role === 'assistant' ? (
-                    <div className="ch-markdown">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {msg.content}
-                      </ReactMarkdown>
+                {msg.role === 'assistant' ? (
+                  <div className="ch-msg-col">
+                    <div className="ch-bubble ch-bubble-assistant">
+                      <div className="ch-markdown">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                      {msg.streaming && !msg.content && (
+                        <span className="ch-typing-dots" aria-label="Generating response">
+                          <span /><span /><span />
+                        </span>
+                      )}
+                      {msg.streaming && msg.content && (
+                        <span className="ch-cursor" aria-hidden="true" />
+                      )}
                     </div>
-                  ) : (() => {
+                    {!msg.streaming && msg.content && (
+                      <div className="ch-msg-actions">
+                        <button
+                          className="ch-copy-btn"
+                          onClick={() => copyMessage(msg.id, msg.content)}
+                          aria-label="Copy message"
+                        >
+                          {copiedId === msg.id
+                            ? <><Check size={12} strokeWidth={2.5} />Copied</>
+                            : <><Copy size={12} strokeWidth={2} />Copy</>
+                          }
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                <div className={`ch-bubble ch-bubble-${msg.role}`}>
+                  {(() => {
                     // Prefer structured attachment field; fall back to legacy [filename] suffix in stored content.
                     const parsed = msg.attachment ? null : parseFileFromContent(msg.content);
                     const fileName = msg.attachment?.filename ?? parsed?.fileName ?? null;
@@ -713,6 +748,7 @@ const UserDashboard: React.FC = () => {
                     <span className="ch-cursor" aria-hidden="true" />
                   )}
                 </div>
+                )}
               </div>
             ))}
             {/* Regenerate button after last assistant message */}

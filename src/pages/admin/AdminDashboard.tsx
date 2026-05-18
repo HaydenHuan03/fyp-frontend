@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, Bell, Menu, Sun, Moon } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useState, useEffect } from 'react';
+import { Menu } from 'lucide-react';
+import { useAuth } from '../../context/useAuth';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import Overview from './Overview';
 import UserManagement from './UserManagement';
@@ -13,11 +13,8 @@ import AuditLog from './AuditLog';
 import RagAnalytics from './RagAnalytics';
 import RagEvaluation from './RagEvaluation';
 import { apiListAlerts } from '../../lib/api';
-
-type Section =
-  | 'overview' | 'users' | 'knowledge' | 'documents'
-  | 'conversations' | 'reports' | 'alerts' | 'audit'
-  | 'rag-analytics' | 'rag-evaluation';
+import { type Section } from '../../types/admin';
+import { getInitials } from '../../lib/utils';
 
 const SECTIONS: Section[] = [
   'overview', 'users', 'knowledge', 'documents',
@@ -33,43 +30,28 @@ const LABELS: Record<Section, string> = {
 };
 
 const SESSION_KEY = 'adm_section';
-const THEME_KEY   = 'adm_theme';
 
 function readSection(): Section {
   const s = sessionStorage.getItem(SESSION_KEY) as Section | null;
   return s && SECTIONS.includes(s) ? s : 'overview';
 }
-function readTheme(): 'light' | 'dark' {
-  return (localStorage.getItem(THEME_KEY) as 'light' | 'dark') || 'light';
-}
-function initials(email: string): string {
-  const local = email.split('@')[0];
-  const parts = local.split(/[._-]/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return local.slice(0, 2).toUpperCase();
-}
 
 const AdminDashboard: React.FC = () => {
   const [section, setSection]           = useState<Section>(readSection);
   const [mobileSidebarOpen, setMobile]  = useState(false);
-  const [theme, setTheme]               = useState<'light' | 'dark'>(readTheme);
   const [alertCount, setAlertCount]     = useState(0);
   const { user } = useAuth();
 
-  const userInitials = user?.email ? initials(user.email) : 'AD';
+  const userInitials = user?.email ? getInitials(user.email) : 'AD';
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
-
-  const fetchAlertCount = useCallback(async () => {
     if (!user) return;
-    try { setAlertCount((await apiListAlerts(user.accessToken)).length); }
-    catch { /* silent */ }
+    let cancelled = false;
+    apiListAlerts(user.accessToken)
+      .then(alerts => { if (!cancelled) setAlertCount(alerts.length); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [user]);
-
-  useEffect(() => { fetchAlertCount(); }, [fetchAlertCount]);
 
   const go = (s: Section) => {
     sessionStorage.setItem(SESSION_KEY, s);
@@ -104,26 +86,7 @@ const AdminDashboard: React.FC = () => {
             <span className="here">{LABELS[section]}</span>
           </div>
 
-          <div className="top__cmd" role="search">
-            <Search size={14} />
-            <span>Search…</span>
-            <span className="kbd">⌘K</span>
-          </div>
-
-          <button
-            className="top__icon"
-            onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
-            title={theme === 'light' ? 'Dark mode' : 'Light mode'}
-          >
-            {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
-          </button>
-
-          <button className="top__icon" title="Notifications">
-            <Bell size={15} />
-            {alertCount > 0 && <span className="top__icon-dot" />}
-          </button>
-
-          <div className="avatar" title={user?.email}>{userInitials}</div>
+          <div className="avatar" title={user?.email} style={{ marginLeft: 'auto' }}>{userInitials}</div>
         </header>
 
         {section === 'overview'      && <Overview />}
@@ -133,7 +96,7 @@ const AdminDashboard: React.FC = () => {
         {section === 'conversations' && <Conversations />}
         {section === 'reports'       && <CaseReports />}
         {section === 'alerts'        && <Alerts />}
-{section === 'audit'          && <AuditLog />}
+        {section === 'audit'          && <AuditLog />}
         {section === 'rag-analytics'  && <RagAnalytics />}
         {section === 'rag-evaluation' && <RagEvaluation />}
       </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Loader, X, RefreshCw, Eye, ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import {
   apiListDocuments, apiUploadDocuments, apiIngestDocuments,
   apiDeleteDocument, apiListDocumentChunks,
