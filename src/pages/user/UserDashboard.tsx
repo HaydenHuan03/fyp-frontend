@@ -81,6 +81,11 @@ const UserDashboard: React.FC = () => {
   const sessionIdForWsRef = useRef<number | null>(null);
   const uploadAbortRef = useRef<AbortController | null>(null);
   const uploadReqIdRef = useRef(0);
+  // Typewriter streaming: backend tokens land in this buffer, a timer flushes
+  // 1 char per tick (adaptive catch-up if backend gets ahead).
+  const streamBufferRef = useRef<string>('');
+  const streamFinalRef = useRef<{ sources?: string[] } | null>(null);
+  const flushTimerRef = useRef<number | null>(null);
 
   const activeSession = sessions.find(s => s.id === activeId) ?? null;
 
@@ -125,6 +130,66 @@ const UserDashboard: React.FC = () => {
     if (renamingId !== null) renameInputRef.current?.focus();
   }, [renamingId]);
 
+  // ── Typewriter flusher ──────────────────────────────────────────
+  const stopFlusher = useCallback(() => {
+    if (flushTimerRef.current != null) {
+      clearInterval(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+  }, []);
+
+  const finalizeStream = useCallback((overrideContent?: string) => {
+    const aiMsgId = currentAiMsgIdRef.current;
+    const convId = sessionIdForWsRef.current;
+    const final = streamFinalRef.current;
+    stopFlusher();
+    streamBufferRef.current = '';
+    streamFinalRef.current = null;
+    if (aiMsgId && convId) {
+      setSessions(prev => prev.map(s => s.id !== convId ? s : {
+        ...s,
+        messages: s.messages.map(m =>
+          m.id !== aiMsgId ? m : {
+            ...m,
+            ...(overrideContent != null ? { content: overrideContent } : {}),
+            sources: final?.sources ?? m.sources,
+            streaming: false,
+          }
+        ),
+      }));
+    }
+    currentAiMsgIdRef.current = null;
+    setBusy(false);
+  }, [stopFlusher]);
+
+  const startFlusher = useCallback(() => {
+    if (flushTimerRef.current != null) return;
+    flushTimerRef.current = window.setInterval(() => {
+      const aiMsgId = currentAiMsgIdRef.current;
+      const convId = sessionIdForWsRef.current;
+      const buf = streamBufferRef.current;
+      if (!aiMsgId || !convId) {
+        streamBufferRef.current = '';
+        stopFlusher();
+        return;
+      }
+      if (buf.length === 0) {
+        if (streamFinalRef.current) finalizeStream();
+        return;
+      }
+      // Adaptive: if buffer is large, take more chars per tick so we catch up.
+      const take = buf.length > 240 ? 8 : buf.length > 80 ? 3 : 1;
+      const slice = buf.slice(0, take);
+      streamBufferRef.current = buf.slice(take);
+      setSessions(prev => prev.map(s => s.id !== convId ? s : {
+        ...s,
+        messages: s.messages.map(m =>
+          m.id !== aiMsgId ? m : { ...m, content: m.content + slice }
+        ),
+      }));
+    }, 18);
+  }, [stopFlusher, finalizeStream]);
+
   const closeWs = useCallback(() => {
     if (wsRef.current) {
       wsRef.current.onmessage = null;
@@ -136,7 +201,10 @@ const UserDashboard: React.FC = () => {
       wsRef.current = null;
     }
     wsConvIdRef.current = null;
-  }, []);
+    stopFlusher();
+    streamBufferRef.current = '';
+    streamFinalRef.current = null;
+  }, [stopFlusher]);
 
   const connectWs = useCallback(async (conversationId: number): Promise<WebSocket> => {
     if (wsRef.current && wsConvIdRef.current === conversationId && wsRef.current.readyState === WebSocket.OPEN) {
@@ -177,30 +245,15 @@ const UserDashboard: React.FC = () => {
       if (!aiMsgId || !convId) return;
 
       if (data.type === 'token') {
-        setSessions(prev => prev.map(s => s.id !== convId ? s : {
-          ...s,
-          messages: s.messages.map(m =>
-            m.id !== aiMsgId ? m : { ...m, content: m.content + (data.content ?? '') }
-          ),
-        }));
+        streamBufferRef.current += data.content ?? '';
+        startFlusher();
       } else if (data.type === 'done' || data.type === 'stopped') {
-        setSessions(prev => prev.map(s => s.id !== convId ? s : {
-          ...s,
-          messages: s.messages.map(m =>
-            m.id !== aiMsgId ? m : { ...m, sources: data.sources, streaming: false }
-          ),
-        }));
-        currentAiMsgIdRef.current = null;
-        setBusy(false);
+        // Mark for finalize; flusher will drain the buffer first.
+        streamFinalRef.current = { sources: data.sources };
+        startFlusher();
       } else if (data.type === 'error') {
-        setSessions(prev => prev.map(s => s.id !== convId ? s : {
-          ...s,
-          messages: s.messages.map(m =>
-            m.id !== aiMsgId ? m : { ...m, content: data.detail ?? 'An error occurred.', streaming: false }
-          ),
-        }));
-        currentAiMsgIdRef.current = null;
-        setBusy(false);
+        // Errors replace content immediately — skip the typewriter.
+        finalizeStream(data.detail ?? 'An error occurred.');
       }
     };
 
@@ -208,10 +261,19 @@ const UserDashboard: React.FC = () => {
       const aiMsgId = currentAiMsgIdRef.current;
       const convId = sessionIdForWsRef.current;
       if (aiMsgId && convId && event.code !== 1000 && event.code !== 1005) {
+        // Drain anything still in the typewriter buffer, then mark error.
+        const pending = streamBufferRef.current;
+        streamBufferRef.current = '';
+        streamFinalRef.current = null;
+        stopFlusher();
         setSessions(prev => prev.map(s => s.id !== convId ? s : {
           ...s,
           messages: s.messages.map(m =>
-            m.id !== aiMsgId ? m : { ...m, content: m.content || 'Connection lost. Please try again.', streaming: false }
+            m.id !== aiMsgId ? m : {
+              ...m,
+              content: (m.content + pending) || 'Connection lost. Please try again.',
+              streaming: false,
+            }
           ),
         }));
         currentAiMsgIdRef.current = null;
@@ -224,7 +286,7 @@ const UserDashboard: React.FC = () => {
     wsRef.current = ws;
     wsConvIdRef.current = conversationId;
     return ws;
-  }, [closeWs, getValidAccessToken]);
+  }, [closeWs, getValidAccessToken, startFlusher, finalizeStream, stopFlusher]);
 
   useEffect(() => {
     return () => { closeWs(); };

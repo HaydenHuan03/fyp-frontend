@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 import { apiLogin, roleFromToken } from '../lib/api';
-import { Shield, Search, User, Lock, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 const ROLE_HOME = { admin: '/admin/dashboard', user: '/dashboard' } as const;
 
@@ -38,76 +38,78 @@ const LoginPage: React.FC = () => {
   return (
     <div className="lg-root">
 
-      {/* ── Left panel ── */}
-      <div className="lg-left">
+      {/* ── Left panel — editorial cream ── */}
+      <aside className="lg-left">
         <div className="lg-logo">
           <div className="lg-logo-mark">F</div>
           <span className="lg-logo-text">FinGuardMY</span>
         </div>
 
         <div className="lg-headline">
-          <p className="lg-eyebrow">Financial Intelligence Platform</p>
-          <h1>Financial Crime<br />Analysis<br />Platform.</h1>
-          <p>AI-powered tools for investigators — case reports, legal precedents, and document retrieval in one place.</p>
+          <p className="lg-eyebrow">
+            <span className="lg-eyebrow-dot" aria-hidden="true" />
+            Financial Intelligence Platform
+          </p>
+          <h1>
+            Investigate<br />
+            financial crime,<br />
+            with intelligence.
+          </h1>
+          <p className="lg-lede">
+            Case reports, legal precedents, and document retrieval —
+            unified into one investigator-grade workspace.
+          </p>
         </div>
 
-        <div className="lg-feats">
-          <div className="lg-feat">
-            <div className="lg-feat-icon">
-              <Shield size={13} />
-            </div>
-            Advanced security &amp; compliance
-          </div>
-          <div className="lg-feat">
-            <div className="lg-feat-icon">
-              <Search size={13} />
-            </div>
-            Reliable analysis &amp; suggestions
-          </div>
-        </div>
-      </div>
+        <ul className="lg-trust">
+          <li><span className="lg-trust-key">01</span> Advanced security &amp; compliance</li>
+          <li><span className="lg-trust-key">02</span> Reliable AI-assisted analysis</li>
+          <li><span className="lg-trust-key">03</span> Designed for investigators</li>
+        </ul>
+      </aside>
 
-      {/* ── Right panel ── */}
-      <div className="lg-right">
+      {/* ── Right panel — white sign-in ── */}
+      <main className="lg-right">
         <div className="lg-form-box">
 
-          <h2 className="lg-title">Sign in</h2>
-          <p className="lg-title-sub">Enter your credentials to continue</p>
+          <header className="lg-form-head">
+            <h2 className="lg-title">Sign in</h2>
+            <p className="lg-title-sub">Enter your credentials to continue.</p>
+          </header>
 
-          <form onSubmit={onSubmit}>
+          <form onSubmit={onSubmit} noValidate>
 
             <div className="lg-field">
-              <label htmlFor="email" className="lg-label">Email or username</label>
-              <div className="lg-wrap">
-                <span className="lg-icon"><User size={14} /></span>
-                <input
-                  id="email"
-                  name="email"
-                  type="text"
-                  autoComplete="username"
-                  required
-                  placeholder="you@example.com"
-                  value={form.email}
-                  onChange={onChange}
-                  className="lg-input"
-                />
-              </div>
+              <label htmlFor="email" className="lg-label">Email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="username"
+                required
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={onChange}
+                className="lg-input"
+              />
             </div>
 
             <div className="lg-field">
-              <label htmlFor="password" className="lg-label">Password</label>
+              <div className="lg-label-row">
+                <label htmlFor="password" className="lg-label">Password</label>
+                <a href="#" className="lg-forgot">Forgot password?</a>
+              </div>
               <div className="lg-wrap">
-                <span className="lg-icon"><Lock size={14} /></span>
                 <input
                   id="password"
                   name="password"
                   type={showPass ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  placeholder="Password"
+                  placeholder="••••••••"
                   value={form.password}
                   onChange={onChange}
-                  className="lg-input"
+                  className="lg-input lg-input--pw"
                 />
                 <button
                   type="button"
@@ -115,33 +117,30 @@ const LoginPage: React.FC = () => {
                   onClick={() => setShowPass(v => !v)}
                   aria-label={showPass ? 'Hide password' : 'Show password'}
                 >
-                  {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
             </div>
 
-            <div className="lg-forgot-row">
-              <a href="#" className="lg-forgot">Forgot password?</a>
-            </div>
-
-            {error && <p className="lg-error">{error}</p>}
+            {error && <p className="lg-error" role="alert">{error}</p>}
 
             <button type="submit" disabled={loading} className="lg-btn">
-              {loading
-                ? <><span className="lg-spin" />Signing in…</>
-                : 'Sign in'
-              }
+              {loading ? (
+                <><span className="lg-spin" aria-hidden="true" />Signing in…</>
+              ) : (
+                <>Sign in <ArrowRight size={15} strokeWidth={2} /></>
+              )}
             </button>
 
           </form>
 
           <p className="lg-support">
-            Having issues? Contact{' '}
+            Need help? Contact{' '}
             <a href="mailto:finguard12@gmail.com">finguard12@gmail.com</a>
           </p>
 
         </div>
-      </div>
+      </main>
 
     </div>
   );
