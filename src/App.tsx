@@ -7,10 +7,6 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import UserDashboard from './pages/user/UserDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// When the user presses the browser back button while authenticated, prompt
-// them with a Sign Out / Stay confirmation modal. The pushState sentinel
-// ensures the back press is captured inside the SPA instead of exiting to
-// the browser homepage when the dashboard is the only history entry.
 const BackButtonSignOut: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -43,7 +39,10 @@ const BackButtonSignOut: React.FC = () => {
   return (
     <div className="adm-modal-overlay">
       <div className="adm-modal" style={{ maxWidth: 400 }}>
-        <div className="adm-modal-title">Sign Out?</div>
+        <div className="adm// When the user presses the browser back button while authenticated, prompt
+// them with a Sign Out / Stay confirmation modal. The pushState sentinel
+// ensures the back press is captured inside the SPA instead of exiting to
+// the browser homepage when the dashboard is the only history entry.-modal-title">Sign Out?</div>
         <div className="adm-modal-sub">
           You are about to leave the dashboard. This will sign you out of your current session.
         </div>
