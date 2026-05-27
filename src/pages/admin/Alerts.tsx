@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ShieldAlert, Search, Loader, Settings2, Eye, X as XIcon } from 'lucide-react';
+import { ShieldAlert, Search, Loader, Eye, X as XIcon } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { apiListAlerts, apiDeleteAlert, type AlertItem } from '../../lib/api';
 import { useToast } from '../../hooks/useToast';
@@ -57,7 +57,6 @@ const Alerts: React.FC = () => {
           <h1 className="page__title">Alerts</h1>
           <div className="page__sub">Flagged user queries matching prompt-injection or jailbreak patterns.</div>
         </div>
-        <button className="btn btn--ghost"><Settings2 size={14} /> Detection rules</button>
       </div>
 
       <div className="stats">

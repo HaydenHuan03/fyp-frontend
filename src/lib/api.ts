@@ -407,6 +407,19 @@ export async function apiListDocumentChunks(
   return handleResponse<ChunkPreviewItem[]>(res, 'Failed to fetch chunks');
 }
 
+export interface DocumentPreviewUrl {
+  url: string;
+  filename: string;
+  expires_in: number;
+}
+
+export async function apiGetDocumentPreviewUrl(token: string, id: number): Promise<DocumentPreviewUrl> {
+  const res = await authFetch(`${BASE_URL}/rag/documents/${id}/preview-url`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<DocumentPreviewUrl>(res, 'Failed to load preview URL');
+}
+
 export async function apiDeleteDocument(token: string, id: number): Promise<void> {
   const res = await authFetch(`${BASE_URL}/rag/documents/${id}`, token, {
     method: 'DELETE',

@@ -2797,46 +2797,44 @@ body {
 ─────────────────────────────────────────────── */
 
 :root {
-  /* Surfaces — DESIGN.md canvas + stone system */
-  --bg:#ffffff; --surface:#ffffff; --surface-2:#fafafa;
-  --surface-3:#f5f4f0; --stone:#eeece7;
-  /* Borders — DESIGN.md hairline + border-light */
-  --line:#d9d9dd; --line-2:#e5e7eb;
+  /* Surfaces — DESIGN.md canvas + surface system */
+  --bg:#f5f1ec;            /* canvas — cream, NEVER pure white */
+  --surface:#ffffff;       /* surface-1 — white cards lift onto cream */
+  --surface-2:#ebe7e1;     /* surface-2 — alt-cream stripes */
+  --surface-3:#ebe7e1;     /* selected nav rows */
+  --stone:#ebe7e1;
+  /* Borders — DESIGN.md hairline + hairline-soft */
+  --line:#d3cec6; --line-2:#ebe7e1;
   /* Text — DESIGN.md ink scale */
-  --ink:#17171c; --ink-2:#212121; --ink-3:#616161; --ink-4:#93939f;
+  --ink:#111111;           /* ink */
+  --ink-2:#626260;         /* ink-muted */
+  --ink-3:#7b7b78;         /* ink-subtle */
+  --ink-4:#9c9fa5;         /* ink-tertiary */
   /* Brand palette — DESIGN.md */
-  --coral:#ff7759; --coral-soft:#ffad9b;
-  --action-blue:#1863dc; --focus-blue:#4c6ee6;
-  --deep-green:#003c33; --dark-navy:#071829;
-  /* Accent = near-black (primary action color per DESIGN.md) */
-  --accent:#17171c; --accent-deep:#000000; --accent-tint:rgba(23,23,28,0.06);
-  /* Semantic */
+  --fin-orange:#ff5600;    /* AI/Fin product accent — Fin CTAs only */
+  --brand-blue:#0007cb;
+  /* System primary = charcoal (DESIGN.md) */
+  --accent:#111111; --accent-deep:#000000; --accent-tint:rgba(17,17,17,0.06);
+  /* Semantic (admin-only; DESIGN.md does not spec UI semantics) */
   --success:#15803D; --success-tint:rgba(21,128,61,0.08);
-  --danger:#b30000; --danger-tint:rgba(179,0,0,0.06);
-  --warn:#B45309; --warn-tint:rgba(180,83,9,0.08);
+  --danger:#c41c1c;  --danger-tint:rgba(196,28,28,0.08);
+  --warn:#B45309;    --warn-tint:rgba(180,83,9,0.08);
   /* Layout */
   --row-h:44px; --pad-y:13px; --pad-x:16px; --gap-stat:16px;
   --page-pad-y:40px; --page-pad-x:48px;
-  /* Typography — DESIGN.md font stack */
-  --font-sans:'Inter',Arial,ui-sans-serif,system-ui,sans-serif;
-  --font-display:'Space Grotesk','Inter',ui-sans-serif,system-ui,sans-serif;
-  --font-mono:ui-monospace,'Courier New',monospace;
-  /* Radius scale — DESIGN.md */
-  --r:4px;    /* xs */
-  --r-2:8px;  /* sm */
-  --r-md:16px;  /* md */
-  --r-lg:22px;  /* lg — media cards */
-  --r-xl:30px;  /* xl — filter pills */
-  --r-pill:32px; /* pill — primary CTAs */
-}
-[data-theme="dark"] {
-  --bg:#0D0D0E; --surface:#111113; --surface-2:#1C1C1F;
-  --surface-3:#27272A; --stone:#1e1e1a; --line:#2E2E32; --line-2:#222226;
-  --ink:#FAFAFA; --ink-2:#D4D4D8; --ink-3:#71717A; --ink-4:#52525B;
-  --accent-tint:rgba(255,255,255,0.07);
-  --success-tint:rgba(21,128,61,0.12);
-  --danger-tint:rgba(179,0,0,0.12);
-  --warn-tint:rgba(180,83,9,0.12);
+  /* Typography — DESIGN.md (Saans proprietary; Inter is documented substitute) */
+  --font-sans:'Saans','Inter',Arial,ui-sans-serif,system-ui,sans-serif;
+  --font-display:'Saans','Inter',ui-sans-serif,system-ui,sans-serif;
+  --font-mono:'SaansMono','JetBrains Mono',ui-monospace,'Courier New',monospace;
+  /* Radius — DESIGN.md scale */
+  --r:4px;        /* xs — chips, badges */
+  --r-sm:6px;     /* sm — inline tags */
+  --r-2:8px;      /* md — buttons, inputs (default) */
+  --r-md:8px;     /* md — alias */
+  --r-lg:12px;    /* lg — cards, FAQ rows */
+  --r-xl:16px;    /* xl — product-mockup tiles */
+  --r-xxl:24px;   /* xxl — oversized CTA banners */
+  --r-pill:9999px;/* pill — tab toggles, avatars */
 }
 [data-density="dense"]  { --row-h:36px; --pad-y:9px; --pad-x:14px; --gap-stat:12px; --page-pad-y:28px; --page-pad-x:36px; }
 [data-density="airy"]   { --row-h:56px; --pad-y:18px; --pad-x:20px; --gap-stat:20px; --page-pad-y:56px; --page-pad-x:64px; }
@@ -7680,4 +7678,66 @@ body {
 .ch-bubble-assistant li {
   overflow-wrap: anywhere;
   word-break: normal;
+}
+
+/* ── Documents: clickable row + PDF preview modal ───────────────── */
+.t__row--clickable { cursor: pointer; transition: background 80ms ease; }
+.t__row--clickable:hover td { background: var(--surface-2); }
+
+.spin {
+  animation: docs-spin 700ms linear infinite;
+  transform-origin: center;
+}
+@keyframes docs-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.pdf-modal__scrim {
+  position: fixed; inset: 0;
+  background: rgba(17,17,17,0.45);
+  z-index: 80;
+}
+.pdf-modal {
+  position: fixed;
+  top: 0; right: 0;
+  width: min(900px, 92vw);
+  height: 100vh;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: -16px 0 40px -12px rgba(0,0,0,0.18);
+  z-index: 81;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: pdf-modal-in 180ms ease-out;
+}
+@keyframes pdf-modal-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+.pdf-modal__head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.pdf-modal__title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13.5px; font-weight: 550; color: var(--ink);
+  min-width: 0; flex: 1;
+}
+.pdf-modal__title span {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pdf-modal__actions {
+  display: flex; align-items: center; gap: 8px;
+}
+.pdf-modal__body {
+  flex: 1; min-height: 0;
+  background: var(--surface-2);
+}
+.pdf-modal__iframe {
+  width: 100%; height: 100%;
+  border: 0;
+  display: block;
 }

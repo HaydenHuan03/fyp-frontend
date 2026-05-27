@@ -4,7 +4,7 @@ import { useAuth } from '../context/useAuth';
 import { apiLogin, roleFromToken } from '../lib/api';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 
-const ROLE_HOME = { admin: '/admin/dashboard', user: '/dashboard' } as const;
+const ROLE_HOME = { admin: '/admin/dashboard', user: '/chat' } as const;
 
 const LoginPage: React.FC = () => {
   const [form, setForm]         = useState({ email: '', password: '' });
@@ -27,7 +27,7 @@ const LoginPage: React.FC = () => {
       const data = await apiLogin(form.email, form.password);
       const role = roleFromToken(data.access_token);
       login({ email: form.email, role, accessToken: data.access_token, refreshToken: data.refresh_token });
-      navigate(ROLE_HOME[role], { replace: true });
+      navigate(ROLE_HOME[role]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

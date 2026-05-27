@@ -1,5 +1,5 @@
 import type { User } from '../../lib/api';
-import { Pencil, Trash2, KeyRound } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 
 interface Props {
   users: User[];
@@ -93,9 +93,6 @@ const UserTable: React.FC<Props> = ({ users, loading, onEdit, onDelete }) => {
                     <div className="row-actions">
                       <button className="row-btn" title="Edit user" onClick={() => onEdit(u)}>
                         <Pencil size={13} />
-                      </button>
-                      <button className="row-btn" title="Reset password">
-                        <KeyRound size={13} />
                       </button>
                       <button className="row-btn row-btn--danger" title="Delete user" onClick={() => onDelete(u)}>
                         <Trash2 size={13} />

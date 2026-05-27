@@ -9,7 +9,7 @@ interface Props {
 
 const ROLE_HOME: Record<UserRole, string> = {
   admin: '/admin/dashboard',
-  user:  '/dashboard',
+  user:  '/chat',
 };
 
 const ProtectedRoute: React.FC<Props> = ({ children, role }) => {
