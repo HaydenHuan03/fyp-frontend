@@ -54,7 +54,12 @@ const Documents: React.FC = () => {
     setPreviewLoadingId(doc.id);
     try {
       const res = await apiGetDocumentPreviewUrl(user!.accessToken, doc.id);
-      setPreview({ filename: res.filename, url: res.url });
+      if (window.innerWidth <= 720) {
+        window.open(res.url, '_blank', 'noopener,noreferrer');
+        setSheetDoc(null);
+      } else {
+        setPreview({ filename: res.filename, url: res.url });
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Failed to open preview', 'error');
     } finally {
