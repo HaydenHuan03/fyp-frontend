@@ -7742,6 +7742,30 @@ body {
   display: block;
 }
 
+/* ── Sidebar close button (mobile only) ────────────────────────── */
+.side__close {
+  display: none;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-3);
+  border-radius: var(--r);
+  transition: background 120ms ease, color 120ms ease;
+  flex-shrink: 0;
+}
+.side__close:hover { background: var(--surface-2); color: var(--ink); }
+
+@media (max-width: 900px) {
+  .side__close { display: flex; }
+  /* Ensure the brand row stretches so the close btn goes to the far right */
+  .side__brand { display: flex; align-items: center; width: 100%; }
+}
+
 /* ── Mobile page head: wrap title + CTA button ─────────────────── */
 @media (max-width: 720px) {
   .page__head {

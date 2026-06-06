@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Gauge, Users, Library, Files,
   MessagesSquare, TriangleAlert,
-  ScrollText, LogOut, ChartLine, Microscope,
+  ScrollText, LogOut, ChartLine, Microscope, X,
 } from 'lucide-react';
 import { type Section } from '../../types/admin';
 import { getInitials } from '../../lib/utils';
@@ -79,6 +79,15 @@ const AdminSidebar: React.FC<Props> = ({
         <div className="side__brand">
           <div className="side__mark">F</div>
           <div className="side__brand-name">FinGuardMY</div>
+          {mobileOpen && (
+            <button
+              className="side__close"
+              onClick={onMobileClose}
+              aria-label="Close navigation"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {GROUPS.map(g => (
