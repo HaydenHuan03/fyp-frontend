@@ -1,4 +1,4 @@
 export type Section =
   | 'overview' | 'users' | 'knowledge' | 'documents'
-  | 'conversations' | 'reports' | 'alerts' | 'audit'
+  | 'conversations' | 'alerts' | 'audit'
   | 'rag-analytics' | 'rag-evaluation';

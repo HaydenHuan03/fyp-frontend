@@ -765,6 +765,47 @@ export async function apiUpdateEvalSchedule(token: string, cron: string): Promis
   return handleResponse<EvalScheduleOut>(res, 'Failed to update evaluation schedule');
 }
 
+// ── Audit Logs ───────────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: number;
+  user_id: string;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  details: string | null;
+  ip_address: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface AuditLogParams {
+  user_id?: string;
+  action?: string;
+  resource_type?: string;
+  status?: string;
+  start_date?: string;
+  end_date?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function apiListAuditLogs(token: string, params: AuditLogParams = {}): Promise<AuditLogEntry[]> {
+  const q = new URLSearchParams();
+  if (params.user_id)       q.set('user_id', params.user_id);
+  if (params.action)        q.set('action', params.action);
+  if (params.resource_type) q.set('resource_type', params.resource_type);
+  if (params.status)        q.set('status', params.status);
+  if (params.start_date)    q.set('start_date', params.start_date);
+  if (params.end_date)      q.set('end_date', params.end_date);
+  if (params.limit != null) q.set('limit', String(params.limit));
+  if (params.offset != null) q.set('offset', String(params.offset));
+  const res = await authFetch(`${BASE_URL}/audit-logs/?${q}`, token, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<AuditLogEntry[]>(res, 'Failed to fetch audit logs');
+}
+
 /** Upload a file to a chat conversation and extract its text for prompt injection. */
 export async function apiUploadChatAttachment(
   token: string,

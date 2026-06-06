@@ -49,6 +49,7 @@ const KnowledgeBase: React.FC = () => {
   const [chunksModal, setChunksModal] = useState<ChunksModal | null>(null);
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | IngestStatus>('all');
+  const [sheetDoc, setSheetDoc]   = useState<DocumentListItem | null>(null);
   const { toasts, toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,6 +60,13 @@ const KnowledgeBase: React.FC = () => {
   }, [user, toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!sheetDoc) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSheetDoc(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sheetDoc]);
 
   useEffect(() => {
     const hasActive = docs.some(d => d.ingest_status === 'pending' || d.ingest_status === 'ingesting');
@@ -239,53 +247,127 @@ const KnowledgeBase: React.FC = () => {
             <span className="s">Upload PDF or JSON files above to get started.</span>
           </div>
         ) : (
-          <div className="table-wrap">
-            <table className="t">
-              <thead>
-                <tr>
-                  <th>Document</th>
-                  <th>Uploaded by</th>
-                  <th>Uploaded</th>
-                  <th style={{ textAlign: 'right' }}>Chunks</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(doc => (
-                  <tr key={doc.id}>
-                    <td>
-                      <div className="file-cell">
-                        <div className="file-icon"><FileText size={13} /></div>
-                        <span className="file-name">{doc.filename}</span>
-                      </div>
-                    </td>
-                    <td className="muted">{doc.uploaded_by}</td>
-                    <td className="num muted">{formatDate(doc.uploaded_at)}</td>
-                    <td className="num" style={{ textAlign: 'right' }}>{doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}</td>
-                    <td><StatusCell status={doc.ingest_status} /></td>
-                    <td>
-                      <div className="row-actions">
-                        {doc.ingest_status === 'ingested' && doc.chunk_count > 0 && (
-                          <button className="row-btn" title="Preview chunks" onClick={() => handleViewChunks(doc)}><Eye size={13} /></button>
-                        )}
-                        {doc.ingest_status !== 'ingesting' && (
-                          <button className="row-btn" title="Re-ingest" disabled={reIngestingId === doc.id} onClick={() => handleReIngest(doc.id, doc.filename)}>
-                            {reIngestingId === doc.id ? <Loader size={13} className="kb-spin" /> : <RefreshCw size={13} />}
-                          </button>
-                        )}
-                        <button className="row-btn row-btn--danger" title="Delete" disabled={deletingId === doc.id} onClick={() => handleDelete(doc.id, doc.filename)}>
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
+          <>
+            {/* ── Desktop table ── */}
+            <div className="table-wrap">
+              <table className="t">
+                <thead>
+                  <tr>
+                    <th>Document</th>
+                    <th>Uploaded by</th>
+                    <th>Uploaded</th>
+                    <th style={{ textAlign: 'right' }}>Chunks</th>
+                    <th>Status</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map(doc => (
+                    <tr key={doc.id}>
+                      <td>
+                        <div className="file-cell">
+                          <div className="file-icon"><FileText size={13} /></div>
+                          <span className="file-name">{doc.filename}</span>
+                        </div>
+                      </td>
+                      <td className="muted">{doc.uploaded_by}</td>
+                      <td className="num muted">{formatDate(doc.uploaded_at)}</td>
+                      <td className="num" style={{ textAlign: 'right' }}>{doc.chunk_count > 0 ? doc.chunk_count.toLocaleString() : '—'}</td>
+                      <td><StatusCell status={doc.ingest_status} /></td>
+                      <td>
+                        <div className="row-actions">
+                          {doc.ingest_status === 'ingested' && doc.chunk_count > 0 && (
+                            <button className="row-btn" title="Preview chunks" onClick={() => handleViewChunks(doc)}><Eye size={13} /></button>
+                          )}
+                          {doc.ingest_status !== 'ingesting' && (
+                            <button className="row-btn" title="Re-ingest" disabled={reIngestingId === doc.id} onClick={() => handleReIngest(doc.id, doc.filename)}>
+                              {reIngestingId === doc.id ? <Loader size={13} className="kb-spin" /> : <RefreshCw size={13} />}
+                            </button>
+                          )}
+                          <button className="row-btn row-btn--danger" title="Delete" disabled={deletingId === doc.id} onClick={() => handleDelete(doc.id, doc.filename)}>
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── Mobile compact list ── */}
+            <div className="mob-list">
+              {filtered.map(doc => (
+                <button key={doc.id} className="mob-row" onClick={() => setSheetDoc(doc)}>
+                  <div className="file-icon"><FileText size={15} /></div>
+                  <div className="mob-row__info">
+                    <span className="mob-row__name">{doc.filename}</span>
+                    <span className="mob-row__sub">{doc.uploaded_by} · {formatDate(doc.uploaded_at)}</span>
+                  </div>
+                  <IngestStatusBadge status={doc.ingest_status} />
+                  <ChevronRight size={14} className="mob-row__chevron" />
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </div>
+
+      {/* ── Document bottom sheet (mobile) ── */}
+      {sheetDoc && (() => {
+        const isReingest = reIngestingId === sheetDoc.id;
+        const isDelete   = deletingId    === sheetDoc.id;
+        return (
+          <>
+            <div className="mob-sheet__scrim" onClick={() => setSheetDoc(null)} aria-hidden="true" />
+            <div className="mob-sheet" role="dialog" aria-modal="true" aria-label="Document details">
+              <div className="mob-sheet__handle" />
+              <div className="mob-sheet__head">
+                <div className="file-icon"><FileText size={18} /></div>
+                <div className="mob-sheet__head-info">
+                  <div className="mob-sheet__title">{sheetDoc.filename}</div>
+                  <div className="mob-sheet__sub">{sheetDoc.uploaded_by}</div>
+                </div>
+                <button className="row-btn" onClick={() => setSheetDoc(null)} title="Close"><X size={14} /></button>
+              </div>
+              <div className="mob-sheet__body">
+                <div className="mob-sheet__field">
+                  <span className="mob-sheet__label">Uploaded</span>
+                  <span className="num muted">{formatDate(sheetDoc.uploaded_at)}</span>
+                </div>
+                <div className="mob-sheet__field">
+                  <span className="mob-sheet__label">Chunks</span>
+                  <span className="num">{sheetDoc.chunk_count > 0 ? sheetDoc.chunk_count.toLocaleString() : '—'}</span>
+                </div>
+                <div className="mob-sheet__field">
+                  <span className="mob-sheet__label">Status</span>
+                  <StatusCell status={sheetDoc.ingest_status} />
+                </div>
+              </div>
+              <div className="mob-sheet__footer" style={{ flexWrap: 'wrap' }}>
+                {sheetDoc.ingest_status === 'ingested' && sheetDoc.chunk_count > 0 && (
+                  <button className="btn btn--ghost" onClick={() => { handleViewChunks(sheetDoc); setSheetDoc(null); }}>
+                    <Eye size={13} /> Chunks
+                  </button>
+                )}
+                {sheetDoc.ingest_status !== 'ingesting' && (
+                  <button className="btn btn--ghost" disabled={isReingest} onClick={() => handleReIngest(sheetDoc.id, sheetDoc.filename)}>
+                    {isReingest ? <Loader size={13} className="kb-spin" /> : <RefreshCw size={13} />}
+                    Re-ingest
+                  </button>
+                )}
+                <button
+                  className="btn btn--danger"
+                  disabled={isDelete}
+                  onClick={() => { handleDelete(sheetDoc.id, sheetDoc.filename); setSheetDoc(null); }}
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Chunks modal */}
       {chunksModal && (

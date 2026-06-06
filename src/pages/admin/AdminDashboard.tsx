@@ -7,7 +7,6 @@ import UserManagement from './UserManagement';
 import KnowledgeBase from './KnowledgeBase';
 import Documents from './Documents';
 import Conversations from './Conversations';
-import CaseReports from './CaseReports';
 import Alerts from './Alerts';
 import AuditLog from './AuditLog';
 import RagAnalytics from './RagAnalytics';
@@ -18,13 +17,13 @@ import { getInitials } from '../../lib/utils';
 
 const SECTIONS: Section[] = [
   'overview', 'users', 'knowledge', 'documents',
-  'conversations', 'reports', 'alerts', 'audit',
+  'conversations', 'alerts', 'audit',
   'rag-analytics', 'rag-evaluation',
 ];
 
 const LABELS: Record<Section, string> = {
   overview: 'Overview', users: 'Users', knowledge: 'Knowledge base',
-  documents: 'Documents', conversations: 'Conversations', reports: 'Case reports',
+  documents: 'Documents', conversations: 'Conversations',
   alerts: 'Alerts', audit: 'Audit log',
   'rag-analytics': 'RAG Analytics', 'rag-evaluation': 'RAG Evaluation',
 };
@@ -94,7 +93,6 @@ const AdminDashboard: React.FC = () => {
         {section === 'knowledge'     && <KnowledgeBase />}
         {section === 'documents'     && <Documents />}
         {section === 'conversations' && <Conversations />}
-        {section === 'reports'       && <CaseReports />}
         {section === 'alerts'        && <Alerts />}
         {section === 'audit'          && <AuditLog />}
         {section === 'rag-analytics'  && <RagAnalytics />}

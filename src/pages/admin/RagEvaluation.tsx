@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, Trash2, Plus, DatabaseZap, CalendarClock, ChevronRight, X, Save } from 'lucide-react';
+import { Play, Trash2, Plus, DatabaseZap, ChevronRight, X } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import {
   apiListEvalDataset, apiAddEvalEntry, apiDeleteEvalEntry, apiSeedEvalDataset,
-  apiTriggerEvalRun, apiListEvalRuns, apiGetEvalRun, apiGetEvalSchedule, apiUpdateEvalSchedule,
-  type DatasetEntryOut, type EvalRunOut, type EvalRunDetail, type EvalScheduleOut,
+  apiTriggerEvalRun, apiListEvalRuns, apiGetEvalRun,
+  type DatasetEntryOut, type EvalRunOut, type EvalRunDetail,
 } from '../../lib/api';
 
 const METRICS: { key: keyof EvalRunOut; label: string; color: string }[] = [
@@ -41,13 +41,10 @@ const RagEvaluation: React.FC = () => {
 
   const [dataset,       setDataset]       = useState<DatasetEntryOut[]>([]);
   const [runs,          setRuns]          = useState<EvalRunOut[]>([]);
-  const [schedule,      setSchedule]      = useState<EvalScheduleOut | null>(null);
   const [loading,       setLoading]       = useState(true);
   const [triggering,    setTriggering]    = useState(false);
   const [seeding,       setSeeding]       = useState(false);
-  const [cronDraft,     setCronDraft]     = useState('');
-  const [savingCron,    setSavingCron]    = useState(false);
-  const [tab,           setTab]           = useState<'runs' | 'dataset' | 'schedule'>('runs');
+  const [tab,           setTab]           = useState<'runs' | 'dataset'>('runs');
 
   const [addOpen,       setAddOpen]       = useState(false);
   const [addQuestion,   setAddQuestion]   = useState('');
@@ -59,14 +56,19 @@ const RagEvaluation: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [deleteId,      setDeleteId]      = useState<number | null>(null);
 
+  // Mobile bottom sheet for dataset entries
+  const [sheetEntry,    setSheetEntry]    = useState<DatasetEntryOut | null>(null);
+
   const closeDetail = useCallback(() => { setDetailOpen(false); setDetailRun(null); }, []);
 
   useEffect(() => {
-    if (!detailOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeDetail(); };
+    if (!detailOpen && !sheetEntry) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { closeDetail(); setSheetEntry(null); }
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [detailOpen, closeDetail]);
+  }, [detailOpen, sheetEntry, closeDetail]);
 
   const latestRun = runs.find(r => r.status === 'completed') ?? runs[0] ?? null;
 
@@ -74,15 +76,12 @@ const RagEvaluation: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const [ds, rs, sc] = await Promise.all([
+      const [ds, rs] = await Promise.all([
         apiListEvalDataset(user.accessToken),
         apiListEvalRuns(user.accessToken),
-        apiGetEvalSchedule(user.accessToken),
       ]);
       setDataset(ds);
       setRuns(rs);
-      setSchedule(sc);
-      setCronDraft(sc.cron);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [user]);
@@ -130,6 +129,7 @@ const RagEvaluation: React.FC = () => {
     try {
       await apiDeleteEvalEntry(user.accessToken, id);
       setDataset(prev => prev.filter(e => e.id !== id));
+      if (sheetEntry?.id === id) setSheetEntry(null);
     } catch { /* silent */ }
     finally { setDeleteId(null); }
   };
@@ -145,42 +145,22 @@ const RagEvaluation: React.FC = () => {
     finally { setDetailLoading(false); }
   };
 
-  const handleSaveCron = async () => {
-    if (!user || !cronDraft.trim()) return;
-    setSavingCron(true);
-    try {
-      const sc = await apiUpdateEvalSchedule(user.accessToken, cronDraft.trim());
-      setSchedule(sc);
-    } catch { /* silent */ }
-    finally { setSavingCron(false); }
-  };
-
-  const CRON_PRESETS = [
-    { expr: '0 2 * * *', desc: 'Daily 2 AM'    },
-    { expr: '0 2 * * 1', desc: 'Weekly Mon'     },
-    { expr: '0 2 1 * *', desc: 'Monthly 1st'   },
-  ];
-
   return (
     <div className="page">
 
-      {/* ── Head ───────────────────────────────────────────── */}
+      {/* ── Head ── */}
       <div className="page__head">
         <div>
           <h1 className="page__title">RAG Evaluation</h1>
           <p className="page__sub">Automated quality scoring for the retrieval pipeline</p>
         </div>
-        <button
-          className="btn btn--primary"
-          onClick={handleTrigger}
-          disabled={triggering}
-        >
+        <button className="btn btn--primary" onClick={handleTrigger} disabled={triggering}>
           <Play size={14} />
           {triggering ? 'Running…' : 'Run evaluation'}
         </button>
       </div>
 
-      {/* ── Metrics strip ──────────────────────────────────── */}
+      {/* ── Latest scores strip ── */}
       <div className="card ev-metrics-card">
         <div className="card__head">
           <span className="card__title">Latest scores</span>
@@ -197,7 +177,6 @@ const RagEvaluation: React.FC = () => {
             </div>
           )}
         </div>
-
         <div className="ev-metrics-strip">
           {METRICS.map(m => {
             const raw = latestRun ? (latestRun[m.key] as number | null) : null;
@@ -205,17 +184,11 @@ const RagEvaluation: React.FC = () => {
             return (
               <div key={m.key} className="ev-metric">
                 <span className="ev-metric__label">{m.label}</span>
-                <span
-                  className="ev-metric__value"
-                  style={{ color: raw != null ? m.color : 'var(--ink-4)' }}
-                >
+                <span className="ev-metric__value" style={{ color: raw != null ? m.color : 'var(--ink-4)' }}>
                   {raw != null ? `${pct}%` : '—'}
                 </span>
                 <div className="ev-metric__track">
-                  <div
-                    className="ev-metric__fill"
-                    style={{ width: `${pct}%`, background: m.color }}
-                  />
+                  <div className="ev-metric__fill" style={{ width: `${pct}%`, background: m.color }} />
                 </div>
               </div>
             );
@@ -223,31 +196,19 @@ const RagEvaluation: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Tabs ───────────────────────────────────────────── */}
+      {/* ── Tabs ── */}
       <div className="ev-tabs">
-        <button
-          className={`ev-tab${tab === 'runs' ? ' is-active' : ''}`}
-          onClick={() => setTab('runs')}
-        >
+        <button className={`ev-tab${tab === 'runs' ? ' is-active' : ''}`} onClick={() => setTab('runs')}>
           Eval runs
           <span className="ev-tab__count">{runs.length}</span>
         </button>
-        <button
-          className={`ev-tab${tab === 'dataset' ? ' is-active' : ''}`}
-          onClick={() => setTab('dataset')}
-        >
+        <button className={`ev-tab${tab === 'dataset' ? ' is-active' : ''}`} onClick={() => setTab('dataset')}>
           Dataset
           <span className="ev-tab__count">{dataset.length}</span>
         </button>
-        <button
-          className={`ev-tab${tab === 'schedule' ? ' is-active' : ''}`}
-          onClick={() => setTab('schedule')}
-        >
-          Schedule
-        </button>
       </div>
 
-      {/* ── Runs tab ───────────────────────────────────────── */}
+      {/* ── Runs tab ── */}
       {tab === 'runs' && (
         <div className="card ev-content">
           {loading ? (
@@ -261,76 +222,84 @@ const RagEvaluation: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="table-wrap">
-              <table className="t">
-                <thead>
-                  <tr>
-                    <th>Run</th>
-                    <th>Triggered by</th>
-                    <th>Status</th>
-                    <th>Faith.</th>
-                    <th>Relevancy</th>
-                    <th>Precision</th>
-                    <th>Recall</th>
-                    <th>Correctness</th>
-                    <th>Started</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.map(r => {
-                    const sp = statusPill(r.status);
-                    return (
-                      <tr key={r.id}>
-                        <td>
-                          <span className="ev-run-id">#{r.id}</span>
-                        </td>
-                        <td className="primary">{r.triggered_by}</td>
-                        <td><span className={sp.cls}>{sp.label}</span></td>
-                        <td className="num">{fmtScore(r.faithfulness)}</td>
-                        <td className="num">{fmtScore(r.answer_relevancy)}</td>
-                        <td className="num">{fmtScore(r.context_precision)}</td>
-                        <td className="num">{fmtScore(r.context_recall)}</td>
-                        <td className="num">{fmtScore(r.answer_correctness)}</td>
-                        <td className="muted" style={{ fontSize: 12 }}>{fmtDate(r.started_at)}</td>
-                        <td>
-                          <button
-                            className="row-btn"
-                            onClick={() => handleOpenDetail(r)}
-                            title="View details"
-                          >
-                            <ChevronRight size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Desktop table */}
+              <div className="table-wrap">
+                <table className="t">
+                  <thead>
+                    <tr>
+                      <th>Run</th>
+                      <th>Triggered by</th>
+                      <th>Status</th>
+                      <th>Faith.</th>
+                      <th>Relevancy</th>
+                      <th>Precision</th>
+                      <th>Recall</th>
+                      <th>Correctness</th>
+                      <th>Started</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runs.map(r => {
+                      const sp = statusPill(r.status);
+                      return (
+                        <tr key={r.id}>
+                          <td><span className="ev-run-id">#{r.id}</span></td>
+                          <td className="primary">{r.triggered_by}</td>
+                          <td><span className={sp.cls}>{sp.label}</span></td>
+                          <td className="num">{fmtScore(r.faithfulness)}</td>
+                          <td className="num">{fmtScore(r.answer_relevancy)}</td>
+                          <td className="num">{fmtScore(r.context_precision)}</td>
+                          <td className="num">{fmtScore(r.context_recall)}</td>
+                          <td className="num">{fmtScore(r.answer_correctness)}</td>
+                          <td className="muted" style={{ fontSize: 12 }}>{fmtDate(r.started_at)}</td>
+                          <td>
+                            <button className="row-btn" onClick={() => handleOpenDetail(r)} title="View details">
+                              <ChevronRight size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile compact list */}
+              <div className="mob-list">
+                {runs.map(r => {
+                  const sp = statusPill(r.status);
+                  const faith = r.faithfulness != null ? Math.round(r.faithfulness * 100) + '%' : '—';
+                  return (
+                    <button key={r.id} className="mob-row" onClick={() => handleOpenDetail(r)}>
+                      <div className="mob-row__info">
+                        <span className="mob-row__name">Run #{r.id} · {faith} faith.</span>
+                        <span className="mob-row__sub">{r.triggered_by} · {fmtDate(r.started_at)}</span>
+                      </div>
+                      <span className={sp.cls}>{sp.label}</span>
+                      <ChevronRight size={14} className="mob-row__chevron" />
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
 
-      {/* ── Dataset tab ────────────────────────────────────── */}
+      {/* ── Dataset tab ── */}
       {tab === 'dataset' && (
         <div className="card ev-content">
           <div className="card__head">
             <span className="card__title">Evaluation dataset</span>
             <span className="card__sub">{dataset.length} entries</span>
             <div className="right" style={{ gap: 6 }}>
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={handleSeed}
-                disabled={seeding}
-              >
+              <button className="btn btn--ghost btn--sm" onClick={handleSeed} disabled={seeding}>
                 <DatabaseZap size={13} />
                 {seeding ? 'Seeding…' : 'Seed defaults'}
               </button>
-              <button
-                className="btn btn--primary btn--sm"
-                onClick={() => setAddOpen(v => !v)}
-              >
+              <button className="btn btn--primary btn--sm" onClick={() => setAddOpen(v => !v)}>
                 <Plus size={13} />
                 Add entry
               </button>
@@ -388,141 +357,67 @@ const RagEvaluation: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="table-wrap">
-              <table className="t">
-                <thead>
-                  <tr>
-                    <th>Question</th>
-                    <th>Ground truth</th>
-                    <th>Source</th>
-                    <th>Added</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {dataset.map(e => (
-                    <tr key={e.id}>
-                      <td style={{ maxWidth: 260 }}>
-                        <span className="ev-truncate" title={e.question}>{e.question}</span>
-                      </td>
-                      <td style={{ maxWidth: 260 }}>
-                        <span className="ev-truncate" title={e.ground_truth}>{e.ground_truth}</span>
-                      </td>
-                      <td>
-                        <span className="ev-pill ev-pill--pending">{e.source}</span>
-                      </td>
-                      <td className="muted" style={{ fontSize: 12 }}>{fmtDate(e.created_at)}</td>
-                      <td>
-                        <button
-                          className="row-btn row-btn--danger"
-                          onClick={() => handleDelete(e.id)}
-                          disabled={deleteId === e.id}
-                          title="Delete entry"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </td>
+            <>
+              {/* Desktop table */}
+              <div className="table-wrap">
+                <table className="t">
+                  <thead>
+                    <tr>
+                      <th>Question</th>
+                      <th>Ground truth</th>
+                      <th>Source</th>
+                      <th>Added</th>
+                      <th />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {dataset.map(e => (
+                      <tr key={e.id}>
+                        <td style={{ maxWidth: 260 }}>
+                          <span className="ev-truncate" title={e.question}>{e.question}</span>
+                        </td>
+                        <td style={{ maxWidth: 260 }}>
+                          <span className="ev-truncate" title={e.ground_truth}>{e.ground_truth}</span>
+                        </td>
+                        <td><span className="ev-pill ev-pill--pending">{e.source}</span></td>
+                        <td className="muted" style={{ fontSize: 12 }}>{fmtDate(e.created_at)}</td>
+                        <td>
+                          <button
+                            className="row-btn row-btn--danger"
+                            onClick={() => handleDelete(e.id)}
+                            disabled={deleteId === e.id}
+                            title="Delete entry"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile compact list */}
+              <div className="mob-list">
+                {dataset.map(e => (
+                  <button key={e.id} className="mob-row" onClick={() => setSheetEntry(e)}>
+                    <div className="mob-row__info">
+                      <span className="mob-row__name">{e.question}</span>
+                      <span className="mob-row__sub">{e.source} · {fmtDate(e.created_at)}</span>
+                    </div>
+                    <ChevronRight size={14} className="mob-row__chevron" />
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}
 
-      {/* ── Schedule tab ───────────────────────────────────── */}
-      {tab === 'schedule' && (
-        <div className="ev-content ev-schedule-layout">
-
-          {/* Info panel */}
-          <div className="ev-schedule-info">
-            <div className="ev-schedule-info__icon">
-              <CalendarClock size={22} />
-            </div>
-            <div className="ev-schedule-info__title">Auto-evaluation</div>
-            <p className="ev-schedule-info__body">
-              Set a cron expression to run evaluations on a repeating schedule.
-              Scores are recorded automatically for trend analysis.
-            </p>
-            {schedule && (
-              <div className="ev-schedule-info__status">
-                <div className="ev-schedule-info__row">
-                  <span>Current schedule</span>
-                  <code className="ev-schedule-info__code">{schedule.cron}</code>
-                </div>
-                <div className="ev-schedule-info__row">
-                  <span>Status</span>
-                  <span className={schedule.is_active ? 'ev-pill ev-pill--success' : 'ev-pill ev-pill--pending'}>
-                    {schedule.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Form panel */}
-          <div className="ev-schedule-form card">
-            <div className="card__head">
-              <span className="card__title">Cron expression</span>
-            </div>
-            <div className="ev-schedule-form__body">
-              <div className="df-field">
-                <label className="df-label">Schedule</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    className="df-input"
-                    placeholder="e.g. 0 2 * * 1"
-                    value={cronDraft}
-                    onChange={e => setCronDraft(e.target.value)}
-                    style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}
-                  />
-                  <button
-                    className="btn btn--primary"
-                    onClick={handleSaveCron}
-                    disabled={savingCron || !cronDraft.trim()}
-                    style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-                  >
-                    <Save size={13} />
-                    {savingCron ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-                <p className="df-hint">
-                  Uses standard 5-field cron syntax: <code style={{ fontFamily: 'var(--font-mono)' }}>min hour dom month dow</code>
-                </p>
-              </div>
-
-              <div>
-                <div className="ev-schedule-presets-label">Presets</div>
-                <div className="ev-cron-presets">
-                  {CRON_PRESETS.map(ex => (
-                    <button
-                      key={ex.expr}
-                      className="ev-cron-chip"
-                      onClick={() => setCronDraft(ex.expr)}
-                    >
-                      <code>{ex.expr}</code>
-                      <span>{ex.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Run detail modal ────────────────────────────────── */}
+      {/* ── Run detail modal ── */}
       {detailOpen && (
-        <div
-          className="ev-modal-scrim"
-          onClick={closeDetail}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Evaluation run details"
-        >
+        <div className="ev-modal-scrim" onClick={closeDetail} role="dialog" aria-modal="true" aria-label="Evaluation run details">
           <div className="ev-modal" onClick={e => e.stopPropagation()}>
-
             <div className="ev-modal__head">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span className="ev-modal__title">
@@ -541,16 +436,12 @@ const RagEvaluation: React.FC = () => {
 
             {detailLoading ? (
               <div className="ev-modal__skeleton">
-                <div className="ev-skel" style={{ height: 20, width: '40%' }} />
-                <div className="ev-skel" style={{ height: 16, width: '60%' }} />
-                <div className="ev-skel" style={{ height: 16, width: '50%' }} />
-                <div className="ev-skel" style={{ height: 16, width: '55%' }} />
-                <div className="ev-skel" style={{ height: 16, width: '45%' }} />
-                <div className="ev-skel" style={{ height: 16, width: '58%' }} />
+                {[40, 60, 50, 55, 45, 58].map((w, i) => (
+                  <div key={i} className="ev-skel" style={{ height: i === 0 ? 20 : 16, width: `${w}%` }} />
+                ))}
               </div>
             ) : detailRun ? (
               <>
-                {/* Meta grid */}
                 <div className="ev-modal__meta">
                   {[
                     { label: 'Triggered by', val: detailRun.triggered_by },
@@ -565,12 +456,10 @@ const RagEvaluation: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Score bars */}
                 <div className="ev-modal__body">
                   {detailRun.error && (
                     <div className="df-error" style={{ marginBottom: 4 }}>{detailRun.error}</div>
                   )}
-
                   <div>
                     <div className="ev-modal__section-label">Quality scores</div>
                     <div className="ev-score-rows">
@@ -581,10 +470,7 @@ const RagEvaluation: React.FC = () => {
                           <div key={m.key} className="ev-score-row">
                             <span className="ev-score-row__name">{m.label}</span>
                             <div className="ev-score-row__track">
-                              <div
-                                className="ev-score-row__fill"
-                                style={{ width: `${pct}%`, background: m.color }}
-                              />
+                              <div className="ev-score-row__fill" style={{ width: `${pct}%`, background: m.color }} />
                             </div>
                             <span className="ev-score-row__val" style={{ color: raw != null ? m.color : 'var(--ink-4)' }}>
                               {fmtScore(raw)}
@@ -595,7 +481,6 @@ const RagEvaluation: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Per-question results */}
                   {detailRun.results && detailRun.results.length > 0 && (
                     <div>
                       <div className="ev-modal__section-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -606,9 +491,7 @@ const RagEvaluation: React.FC = () => {
                         {(detailRun.results as Record<string, unknown>[]).map((r, i) => (
                           <div key={i} className="ev-result">
                             <div className="ev-result__q">Q{i + 1}: {String(r.question ?? '')}</div>
-                            {r.answer != null && (
-                              <div className="ev-result__a">{String(r.answer)}</div>
-                            )}
+                            {r.answer != null && <div className="ev-result__a">{String(r.answer)}</div>}
                           </div>
                         ))}
                       </div>
@@ -619,6 +502,42 @@ const RagEvaluation: React.FC = () => {
             ) : null}
           </div>
         </div>
+      )}
+
+      {/* ── Dataset entry bottom sheet (mobile) ── */}
+      {sheetEntry && (
+        <>
+          <div className="mob-sheet__scrim" onClick={() => setSheetEntry(null)} aria-hidden="true" />
+          <div className="mob-sheet" role="dialog" aria-modal="true" aria-label="Dataset entry">
+            <div className="mob-sheet__handle" />
+            <div className="mob-sheet__head">
+              <div className="mob-sheet__head-info">
+                <div className="mob-sheet__title">Dataset entry</div>
+                <div className="mob-sheet__sub">{sheetEntry.source} · {fmtDate(sheetEntry.created_at)}</div>
+              </div>
+              <button className="row-btn" onClick={() => setSheetEntry(null)} title="Close"><X size={14} /></button>
+            </div>
+            <div className="mob-sheet__body">
+              <div className="mob-sheet__field" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                <span className="mob-sheet__label">Question</span>
+                <span style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>{sheetEntry.question}</span>
+              </div>
+              <div className="mob-sheet__field" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                <span className="mob-sheet__label">Ground truth</span>
+                <span style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>{sheetEntry.ground_truth}</span>
+              </div>
+            </div>
+            <div className="mob-sheet__footer">
+              <button
+                className="btn btn--danger"
+                disabled={deleteId === sheetEntry.id}
+                onClick={() => handleDelete(sheetEntry.id)}
+              >
+                <Trash2 size={13} /> Delete entry
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
     </div>

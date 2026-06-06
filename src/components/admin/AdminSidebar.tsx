@@ -3,7 +3,7 @@ import { useAuth } from '../../context/useAuth';
 import { useNavigate } from 'react-router-dom';
 import {
   Gauge, Users, Library, Files,
-  MessagesSquare, ClipboardList, TriangleAlert,
+  MessagesSquare, TriangleAlert,
   ScrollText, LogOut, ChartLine, Microscope,
 } from 'lucide-react';
 import { type Section } from '../../types/admin';
@@ -32,8 +32,7 @@ const GROUPS = [
     label: 'Activity',
     items: [
       { id: 'conversations' as Section, label: 'Conversations', Icon: MessagesSquare,  },
-      { id: 'reports'       as Section, label: 'Case reports',  Icon: ClipboardList,   },
-      { id: 'alerts'        as Section, label: 'Alerts',        Icon: TriangleAlert, badge: true },
+{ id: 'alerts'        as Section, label: 'Alerts',        Icon: TriangleAlert, badge: true },
     ],
   },
   {

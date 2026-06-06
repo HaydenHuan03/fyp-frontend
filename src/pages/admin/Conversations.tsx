@@ -81,6 +81,7 @@ const Conversations: React.FC = () => {
           <span className="toolbar__count">{filtered.length} of {totalCount}</span>
         </div>
 
+        {/* ── Desktop table ── */}
         <div className="table-wrap">
           <table className="t">
             <thead>
@@ -133,6 +134,41 @@ const Conversations: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* ── Mobile compact list ── */}
+        <div className="mob-list">
+          {loading ? (
+            [1,2,3,4].map(i => (
+              <div key={i} className="mob-row" style={{ pointerEvents: 'none' }}>
+                <div className="mob-row__info">
+                  <div className="adm-skeleton" style={{ width: 160, marginBottom: 4 }} />
+                  <div className="adm-skeleton" style={{ width: 100, height: 11 }} />
+                </div>
+              </div>
+            ))
+          ) : filtered.length === 0 ? (
+            <div className="empty" style={{ padding: '32px 20px' }}>
+              <span className="t">
+                {search || scope !== 'all' ? 'No conversations match your filters' : 'No conversations yet'}
+              </span>
+              <span className="s">
+                {search || scope !== 'all'
+                  ? 'Try clearing the search or switching to All.'
+                  : 'Conversations will appear here once users start chatting.'}
+              </span>
+            </div>
+          ) : filtered.map(c => (
+            <button key={c.id} className="mob-row" onClick={() => setOpen(c)}>
+              <div className="mob-row__info">
+                <span className="mob-row__name">{c.title}</span>
+                <span className="mob-row__sub">
+                  #{c.id}{c.case_id ? ` · Case ${c.case_id}` : ' · Ad-hoc'} · {formatDateTime(c.updated_at)}
+                </span>
+              </div>
+              <ChevronRight size={14} className="mob-row__chevron" />
+            </button>
+          ))}
         </div>
 
         {meta.pages > 1 && (

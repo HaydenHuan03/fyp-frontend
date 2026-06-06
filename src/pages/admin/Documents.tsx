@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Loader, X, Eye } from 'lucide-react';
+import { FileText, Loader, X, Eye, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import { apiListDocuments, apiGetDocumentPreviewUrl, type DocumentListItem } from '../../lib/api';
 import { formatDate } from '../../lib/utils';
@@ -23,6 +23,7 @@ const Documents: React.FC = () => {
   const [error, setError]   = useState('');
   const [previewLoadingId, setPreviewLoadingId] = useState<number | null>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [sheetDoc, setSheetDoc] = useState<DocumentListItem | null>(null);
 
   const load = useCallback(async () => {
     try { setDocs(await apiListDocuments(user!.accessToken)); }
@@ -33,11 +34,16 @@ const Documents: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (!preview) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPreview(null); };
+    if (!preview && !sheetDoc) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setPreview(null); setSheetDoc(null); }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [preview]);
+  }, [preview, sheetDoc]);
+
+  // Close sheet once the PDF preview successfully opens
+  useEffect(() => { if (preview) setSheetDoc(null); }, [preview]);
 
   const openPreview = async (doc: DocumentListItem) => {
     if (previewLoadingId !== null) return;
@@ -95,6 +101,8 @@ const Documents: React.FC = () => {
               <div className="meta">{grouped[uploader].length} file{grouped[uploader].length !== 1 ? 's' : ''}</div>
             </div>
           </div>
+
+          {/* ── Desktop table ── */}
           <div className="table-wrap">
             <table className="t">
               <thead>
@@ -140,8 +148,71 @@ const Documents: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* ── Mobile compact list ── */}
+          <div className="mob-list">
+            {grouped[uploader].map(doc => (
+              <button key={doc.id} className="mob-row" onClick={() => setSheetDoc(doc)}>
+                <div className="file-icon"><FileText size={15} /></div>
+                <span className="mob-row__name" style={{ flex: 1, minWidth: 0 }}>{doc.filename}</span>
+                <IngestStatusBadge status={doc.ingest_status} />
+                <ChevronRight size={14} className="mob-row__chevron" />
+              </button>
+            ))}
+          </div>
         </div>
       ))}
+
+      {/* ── Document bottom sheet ── */}
+      {sheetDoc && (() => {
+        const isLoading = previewLoadingId === sheetDoc.id;
+        const disabled  = sheetDoc.ingest_status === 'pending' || sheetDoc.ingest_status === 'ingesting';
+        return (
+          <>
+            <div className="mob-sheet__scrim" onClick={() => setSheetDoc(null)} aria-hidden="true" />
+            <div className="mob-sheet" role="dialog" aria-modal="true" aria-label="Document details">
+              <div className="mob-sheet__handle" />
+
+              <div className="mob-sheet__head">
+                <div className="file-icon"><FileText size={18} /></div>
+                <div className="mob-sheet__head-info">
+                  <div className="mob-sheet__title">{sheetDoc.filename}</div>
+                </div>
+                <button className="row-btn" onClick={() => setSheetDoc(null)} title="Close">
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="mob-sheet__body">
+                <div className="mob-sheet__field">
+                  <span className="mob-sheet__label">Uploaded</span>
+                  <span className="num muted">{formatDate(sheetDoc.uploaded_at)}</span>
+                </div>
+                <div className="mob-sheet__field">
+                  <span className="mob-sheet__label">Chunks</span>
+                  <span className="num">{sheetDoc.chunk_count > 0 ? sheetDoc.chunk_count.toLocaleString() : '—'}</span>
+                </div>
+                <div className="mob-sheet__field">
+                  <span className="mob-sheet__label">Status</span>
+                  <IngestStatusBadge status={sheetDoc.ingest_status} />
+                </div>
+              </div>
+
+              <div className="mob-sheet__footer">
+                <button
+                  className="btn btn--primary"
+                  onClick={() => openPreview(sheetDoc)}
+                  disabled={disabled || isLoading}
+                  title={disabled ? 'Document is still processing' : 'Preview PDF'}
+                >
+                  {isLoading ? <Loader size={13} className="spin" /> : <Eye size={13} />}
+                  {isLoading ? 'Loading…' : 'Preview PDF'}
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {preview && (
         <>
