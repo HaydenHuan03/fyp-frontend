@@ -80,14 +80,14 @@ const LoginPage: React.FC = () => {
           <form onSubmit={onSubmit} noValidate>
 
             <div className="lg-field">
-              <label htmlFor="email" className="lg-label">Email</label>
+              <label htmlFor="email" className="lg-label">Email/Username</label>
               <input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="username"
                 required
-                placeholder="you@example.com"
+                placeholder="you@example.com or username"
                 value={form.email}
                 onChange={onChange}
                 className="lg-input"
@@ -95,10 +95,7 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div className="lg-field">
-              <div className="lg-label-row">
-                <label htmlFor="password" className="lg-label">Password</label>
-                <a href="#" className="lg-forgot">Forgot password?</a>
-              </div>
+              <label htmlFor="password" className="lg-label">Password</label>
               <div className="lg-wrap">
                 <input
                   id="password"

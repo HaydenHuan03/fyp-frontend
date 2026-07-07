@@ -163,6 +163,9 @@ const UserModal: React.FC<Props> = ({ open, mode, user, onConfirm, onClose }) =>
                 {showPw ? <EyeOff size={14} aria-hidden /> : <Eye size={14} aria-hidden />}
               </button>
             </div>
+            <span className="df-hint">
+              Must be at least 8 characters and include an uppercase letter, a lowercase letter, a digit, and a symbol.
+            </span>
           </div>
         )}
 

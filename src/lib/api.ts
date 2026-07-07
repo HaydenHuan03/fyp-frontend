@@ -18,7 +18,7 @@ export async function apiLogin(email: string, password: string): Promise<LoginRe
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? 'Login failed');
+    throw new Error(extractErrorMessage(err, 'Login failed'));
   }
 
   return res.json() as Promise<LoginResponseData>;
@@ -149,13 +149,29 @@ async function authFetch(
   }
 }
 
+/** FastAPI error `detail` can be a plain string or a Pydantic validation-error array. */
+interface FastApiErrorBody {
+  detail?: string | { msg?: string; loc?: unknown[] }[];
+}
+
+function extractErrorMessage(err: unknown, fallbackMessage: string): string {
+  const detail = (err as FastApiErrorBody).detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map(d => d.msg?.replace(/^Value error,\s*/, '') ?? fallbackMessage)
+      .join(' ');
+  }
+  return fallbackMessage;
+}
+
 async function handleResponse<T>(res: Response, fallbackMessage: string): Promise<T> {
   if (res.status === 401) {
     throw new Error('Session expired. Please log in again.');
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? fallbackMessage);
+    throw new Error(extractErrorMessage(err, fallbackMessage));
   }
   return res.json() as Promise<T>;
 }
@@ -165,7 +181,7 @@ async function handleDeleteResponse(res: Response, fallbackMessage: string): Pro
   if (res.status === 204) return;
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? fallbackMessage);
+    throw new Error(extractErrorMessage(err, fallbackMessage));
   }
 }
 
